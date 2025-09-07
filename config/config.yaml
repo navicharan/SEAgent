@@ -1,0 +1,183 @@
+# SEAgent Configuration File
+# Development configuration for quick setup
+
+environment_variables:
+  # IMPORTANT: Set these in your .env file, not here!
+  # OPENAI_API_KEY: "your_openai_api_key_here"
+  SECRET_KEY: "dev-secret-key-change-in-production"
+
+environment: development
+debug: true
+task_timeout: 300
+max_concurrent_tasks: 10
+
+# API Server Configuration
+api:
+  host: 0.0.0.0
+  port: 8000
+  cors_origins: ["*"]
+  max_request_size: 10485760  # 10MB
+  rate_limit: 100
+  authentication: false
+
+# OpenAI Configuration
+# NOTE: API key should be set via OPENAI_API_KEY environment variable
+openai:
+  # api_key loaded from environment variable OPENAI_API_KEY
+  model: "gpt-3.5-turbo"
+  max_tokens: 2000
+  temperature: 0.7
+
+# UI Dashboard Configuration  
+ui:
+  host: 0.0.0.0
+  port: 8001
+  title: "SEAgent Dashboard"
+  theme: "dark"
+  refresh_interval: 5
+
+# Database Configuration
+database:
+  url: "sqlite:///seagent.db"
+  echo: false
+  pool_size: 5
+  max_overflow: 10
+
+# Redis Configuration (for task queues and caching)
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  password: null
+  ssl: false
+
+# Logging Configuration
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: null
+  max_file_size: 10485760
+  backup_count: 5
+
+# Security Configuration
+security:
+  secret_key: "dev-secret-key-change-in-production"
+  token_expiry: 3600
+  max_login_attempts: 5
+  session_timeout: 1800
+  encryption_algorithm: "HS256"
+
+# Agent Configurations
+agents:
+  code_generation:
+    enabled: true
+    max_concurrent_tasks: 3
+    timeout: 300
+    retry_attempts: 3
+    log_level: INFO
+    specific_config:
+      primary_model: "gpt-4"
+      temperature: 0.1
+      max_tokens: 2000
+
+  security_analysis:
+    enabled: true
+    max_concurrent_tasks: 2
+    timeout: 600
+    retry_attempts: 2
+    log_level: INFO
+    specific_config:
+      scan_depth: "deep"
+      compliance_standards: ["OWASP", "CWE"]
+      vulnerability_db_update: true
+
+  debug:
+    enabled: true
+    max_concurrent_tasks: 5
+    timeout: 300
+    retry_attempts: 3
+    log_level: DEBUG
+    specific_config:
+      auto_fix_enabled: true
+      fix_strategy: "conservative"
+      debug_depth: "standard"
+
+  performance:
+    enabled: true
+    max_concurrent_tasks: 2
+    timeout: 900
+    retry_attempts: 1
+    log_level: INFO
+    specific_config:
+      profiling_enabled: true
+      benchmark_targets:
+        response_time: 200
+        throughput: 100
+        error_rate: 1.0
+
+  integration:
+    enabled: true
+    max_concurrent_tasks: 3
+    timeout: 600
+    retry_attempts: 2
+    log_level: INFO
+    specific_config:
+      git_enabled: true
+      cicd_platforms: ["github_actions", "gitlab_ci"]
+      deployment_targets: ["staging", "production"]
+
+  testing:
+    enabled: true
+    max_concurrent_tasks: 4
+    timeout: 1200
+    retry_attempts: 2
+    log_level: INFO
+    specific_config:
+      test_frameworks: ["pytest", "jest"]
+      coverage_target: 80
+      security_testing: true
+      performance_testing: true
+
+# Integration Configurations
+integrations:
+  git:
+    enabled: true
+    default_branch: "main"
+    auto_commit: false
+    commit_message_template: "SEAgent: {action} - {timestamp}"
+
+  github:
+    enabled: false
+    token: null  # Set via SEAGENT_GITHUB_TOKEN environment variable
+    organization: null
+    auto_create_pr: false
+
+  gitlab:
+    enabled: false
+    token: null  # Set via SEAGENT_GITLAB_TOKEN environment variable
+    project_id: null
+    auto_create_mr: false
+
+  docker:
+    enabled: true
+    registry: "docker.io"
+    auto_build: false
+    tag_strategy: "semantic"
+
+  kubernetes:
+    enabled: false
+    namespace: "default"
+    cluster_context: null
+    auto_deploy: false
+
+  aws:
+    enabled: false
+    region: "us-west-2"
+    profile: "default"
+    auto_deploy: false
+
+  slack:
+    enabled: false
+    webhook_url: null  # Set via SEAGENT_SLACK_WEBHOOK_URL environment variable
+    channel: "#seagent-notifications"
+    notifications: ["errors", "completions"]
