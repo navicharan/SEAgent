@@ -1,6 +1,6 @@
 # SEAgent - Autonomous Software Engineering Agent System
 
-🤖 **SEAgent** is a comprehensive autonomous software engineering application that addresses critical limitations in current multi-agent LLM systems for automated software development. It provides enterprise-grade capabilities including security analysis, debugging mechanisms, agent collaboration, and real-world integration.
+🤖 **SEAgent** is a comprehensive autonomous software engineering application powered by **DeepSeek-Coder V2**, addressing critical limitations in current multi-agent LLM systems for automated software development. It provides enterprise-grade capabilities including security analysis, debugging mechanisms, agent collaboration, and real-world integration.
 
 ## 🎯 Problem Statement
 
@@ -14,9 +14,10 @@ Current multi-agent LLM systems for automated software development face several 
 
 ## 🚀 Solution Overview
 
-SEAgent provides a sophisticated multi-agent architecture with:
+SEAgent provides a sophisticated multi-agent architecture powered by DeepSeek-Coder V2 with:
 
 - **6 Specialized Agents**: Code Generation, Security Analysis, Debug, Performance, Integration, and Testing
+- **AI-Powered Code Generation**: Leveraging DeepSeek-Coder V2's Mixture-of-Experts architecture
 - **Central Orchestrator**: Manages task coordination, workflows, and inter-agent communication
 - **Enterprise Integration**: CI/CD platforms, version control, deployment tools
 - **Comprehensive Security**: Static analysis, vulnerability detection, compliance checking
@@ -40,16 +41,17 @@ SEAgent/
 
 | Agent | Primary Functions | Key Features |
 |-------|------------------|--------------|
-| **Code Generation** | Generate code, APIs, schemas | Multi-language support, framework integration |
-| **Security Analysis** | Vulnerability scanning, compliance | OWASP/CWE standards, static analysis |
+| **Code Generation** | Generate code, APIs, schemas | DeepSeek-Coder V2, Multi-language support, framework integration |
+| **Security Analysis** | Vulnerability scanning, compliance | AI-enhanced analysis, OWASP/CWE standards, static analysis |
 | **Debug** | Error analysis, fix suggestions | Automated debugging, root cause analysis |
-| **Performance** | Optimization, profiling | Bottleneck detection, performance metrics |
+| **Performance** | Optimization, profiling | AI-powered optimization, Bottleneck detection, performance metrics |
 | **Integration** | CI/CD, deployment | GitHub/GitLab, Jenkins, Docker, K8s |
-| **Testing** | Unit/integration tests | Multi-framework, coverage analysis |
+| **Testing** | Unit/integration tests | AI test generation, Multi-framework, coverage analysis |
 
 ## 📋 Prerequisites
 
 - **Python 3.9+**
+- **DeepSeek API Key** (for AI-powered code generation)
 - **Git** (for version control integration)
 - **Docker** (optional, for containerized deployment)
 - **Redis** (optional, for distributed task queues)
@@ -74,19 +76,16 @@ pip install -r requirements.txt
 Copy the example configuration:
 
 ```bash
-cp config/config.example.yaml config/config.yaml
+cp .env.example .env
 ```
 
-Edit `config/config.yaml` with your specific settings:
+Edit `.env` with your DeepSeek API key:
 
-```yaml
-# Required: Set your API keys
-environment_variables:
-  OPENAI_API_KEY: "your-openai-api-key"
-  GITHUB_TOKEN: "your-github-token"  # Optional
-  SECRET_KEY: "your-secret-key"
-
-# Agent configurations
+```bash
+# DeepSeek-Coder V2 Configuration
+DEEPSEEK_API_KEY=your-deepseek-api-key-here
+DEEPSEEK_MODEL=deepseek-coder
+DEEPSEEK_BASE_URL=https://api.deepseek.com
 agents:
   code_generation:
     enabled: true

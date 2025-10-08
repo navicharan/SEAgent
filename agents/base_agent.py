@@ -71,10 +71,22 @@ class BaseAgent(ABC):
     
     async def health_check(self) -> Dict[str, Any]:
         """Perform a health check on the agent"""
+        # Handle config as both dict and object
+        config_dict = {}
+        if hasattr(self.config, 'items'):
+            # It's a dictionary
+            config_dict = {k: v for k, v in self.config.items() if not str(k).startswith('secret')}
+        elif hasattr(self.config, '__dict__'):
+            # It's an object, get its attributes
+            config_dict = {k: v for k, v in self.config.__dict__.items() if not str(k).startswith('secret')}
+        else:
+            # Fallback - convert to string
+            config_dict = {"config": str(self.config)}
+            
         return {
             "status": "healthy" if self.is_initialized else "not_initialized",
             "capabilities": list(self.capabilities.keys()),
-            "config": {k: v for k, v in self.config.items() if not k.startswith('secret')}
+            "config": config_dict
         }
     
     async def shutdown(self):

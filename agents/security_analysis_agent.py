@@ -1,5 +1,6 @@
 """
 Security Analysis Agent - Comprehensive security vulnerability detection and mitigation
+Enhanced with DeepSeek-Coder V2 for AI-powered security analysis
 """
 
 import asyncio
@@ -9,6 +10,14 @@ from typing import Dict, Any, List, Tuple
 from pathlib import Path
 
 from .base_agent import BaseAgent, AgentCapability
+from config.deepseek_client import DeepSeekClient
+
+# Try to import for DeepSeek compatibility
+try:
+    import openai
+    DEEPSEEK_AVAILABLE = True
+except ImportError:
+    DEEPSEEK_AVAILABLE = False
 
 
 class SecurityAnalysisAgent(BaseAgent):
@@ -77,6 +86,26 @@ class SecurityAnalysisAgent(BaseAgent):
     
     async def _load_models(self):
         """Load security analysis models and databases"""
+        # Initialize DeepSeek client for AI-powered security analysis
+        self.deepseek_client = None
+        
+        if DEEPSEEK_AVAILABLE:
+            try:
+                import os
+                api_key = os.getenv('DEEPSEEK_API_KEY', '').strip()
+                base_url = os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com').strip()
+                model = os.getenv('DEEPSEEK_MODEL', 'deepseek-coder').strip()
+                
+                if api_key and len(api_key) > 10:
+                    self.deepseek_client = DeepSeekClient(
+                        api_key=api_key,
+                        base_url=base_url,
+                        model=model
+                    )
+                    self.logger.info("DeepSeek-Coder V2 client initialized for security analysis")
+            except Exception as e:
+                self.logger.warning(f"DeepSeek initialization failed for security agent: {e}")
+        
         # Load vulnerability databases
         self.cve_database = await self._load_cve_database()
         self.cwe_database = await self._load_cwe_database()
@@ -119,7 +148,7 @@ class SecurityAnalysisAgent(BaseAgent):
             raise ValueError(f"Unknown task type: {task_type}")
     
     async def _static_analysis(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Perform static code analysis for security vulnerabilities"""
+        """Perform static code analysis for security vulnerabilities with AI enhancement"""
         source_code = parameters.get('source_code', '')
         language = parameters.get('language', 'python')
         analysis_depth = parameters.get('analysis_depth', 'standard')
@@ -129,7 +158,17 @@ class SecurityAnalysisAgent(BaseAgent):
         # Simulate analysis process
         await asyncio.sleep(2)  # Simulate processing time
         
+        # Use traditional pattern-based detection
         vulnerabilities = await self._detect_vulnerabilities(source_code, language)
+        
+        # Enhance with AI-powered analysis if available
+        if self.deepseek_client and analysis_depth in ['comprehensive', 'ai-enhanced']:
+            self.logger.info("Enhancing security analysis with DeepSeek-Coder V2")
+            ai_analysis = await self.deepseek_client.analyze_code(source_code, 'security')
+            if ai_analysis['success']:
+                ai_vulnerabilities = await self._parse_ai_security_analysis(ai_analysis['analysis'])
+                vulnerabilities.extend(ai_vulnerabilities)
+        
         risk_score = await self._calculate_risk_score(vulnerabilities)
         recommendations = await self._generate_recommendations(vulnerabilities)
         
@@ -138,6 +177,7 @@ class SecurityAnalysisAgent(BaseAgent):
             'risk_score': risk_score,
             'recommendations': recommendations,
             'analysis_depth': analysis_depth,
+            'ai_enhanced': bool(self.deepseek_client and analysis_depth in ['comprehensive', 'ai-enhanced']),
             'scan_timestamp': asyncio.get_event_loop().time()
         }
     
@@ -507,6 +547,38 @@ class SecurityAnalysisAgent(BaseAgent):
     async def _setup_safety_scanner(self) -> Dict[str, Any]:
         """Setup Safety scanner for dependency vulnerabilities"""
         return {'enabled': True, 'version': '2.3.5'}
+    
+    async def _parse_ai_security_analysis(self, ai_analysis: str) -> List[Dict[str, Any]]:
+        """Parse AI-generated security analysis into structured vulnerabilities"""
+        vulnerabilities = []
+        
+        # Simple parsing logic - in production, this would be more sophisticated
+        lines = ai_analysis.split('\n')
+        current_vuln = {}
+        
+        for line in lines:
+            line = line.strip()
+            if 'vulnerability' in line.lower() or 'security issue' in line.lower():
+                if current_vuln:
+                    vulnerabilities.append(current_vuln)
+                current_vuln = {
+                    'type': 'AI_DETECTED',
+                    'description': line,
+                    'severity': 'medium',
+                    'confidence': 0.8,
+                    'source': 'deepseek-ai'
+                }
+            elif 'critical' in line.lower() and current_vuln:
+                current_vuln['severity'] = 'critical'
+            elif 'high' in line.lower() and current_vuln:
+                current_vuln['severity'] = 'high'
+            elif 'low' in line.lower() and current_vuln:
+                current_vuln['severity'] = 'low'
+        
+        if current_vuln:
+            vulnerabilities.append(current_vuln)
+        
+        return vulnerabilities
     
     async def _setup_threat_intelligence(self) -> Dict[str, Any]:
         """Setup threat intelligence feeds"""

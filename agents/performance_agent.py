@@ -1,5 +1,6 @@
 """
 Performance Agent - Runtime performance analysis and optimization
+Enhanced with DeepSeek-Coder V2 for AI-powered performance optimization
 """
 
 import asyncio
@@ -9,6 +10,14 @@ from typing import Dict, Any, List
 from dataclasses import dataclass
 
 from .base_agent import BaseAgent, AgentCapability
+from config.deepseek_client import DeepSeekClient
+
+# Try to import for DeepSeek compatibility
+try:
+    import openai
+    DEEPSEEK_AVAILABLE = True
+except ImportError:
+    DEEPSEEK_AVAILABLE = False
 
 
 @dataclass
@@ -86,6 +95,26 @@ class PerformanceAgent(BaseAgent):
     
     async def _load_models(self):
         """Load performance analysis models"""
+        # Initialize DeepSeek client for AI-powered performance analysis
+        self.deepseek_client = None
+        
+        if DEEPSEEK_AVAILABLE:
+            try:
+                import os
+                api_key = os.getenv('DEEPSEEK_API_KEY', '').strip()
+                base_url = os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com').strip()
+                model = os.getenv('DEEPSEEK_MODEL', 'deepseek-coder').strip()
+                
+                if api_key and len(api_key) > 10:
+                    self.deepseek_client = DeepSeekClient(
+                        api_key=api_key,
+                        base_url=base_url,
+                        model=model
+                    )
+                    self.logger.info("DeepSeek-Coder V2 client initialized for performance analysis")
+            except Exception as e:
+                self.logger.warning(f"DeepSeek initialization failed for performance agent: {e}")
+        
         # Load performance benchmarks and thresholds
         self.performance_benchmarks = await self._load_performance_benchmarks()
         self.optimization_patterns = await self._load_optimization_patterns()

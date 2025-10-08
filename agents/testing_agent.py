@@ -1,5 +1,6 @@
 """
 Testing Agent - Unified testing for functional correctness, security compliance, and reliability
+Enhanced with DeepSeek-Coder V2 for AI-powered test generation
 """
 
 import asyncio
@@ -10,6 +11,14 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .base_agent import BaseAgent, AgentCapability
+from config.deepseek_client import DeepSeekClient
+
+# Try to import for DeepSeek compatibility
+try:
+    import openai
+    DEEPSEEK_AVAILABLE = True
+except ImportError:
+    DEEPSEEK_AVAILABLE = False
 
 
 class TestType(Enum):

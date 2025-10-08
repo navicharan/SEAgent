@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEAgent - GitHub Integration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+        
+        .panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .panel h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(52, 152, 219, 0.3);
+        }
+        
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+        }
+        
+        .btn-success:hover {
+            box-shadow: 0 10px 20px rgba(39, 174, 96, 0.3);
+        }
+        
+        .status-area {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .status-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .code-output {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin-top: 15px;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .github-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .github-info h4 {
+            color: #495057;
+            margin-bottom: 10px;
+        }
+        
+        .github-info p {
+            color: #6c757d;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 SEAgent GitHub Integration</h1>
+            <p>Generate code with AI and upload directly to your GitHub repositories</p>
+        </div>
+        
+        <div class="main-content">
+            <!-- Code Generation Panel -->
+            <div class="panel">
+                <h3>🚀 Code Generation</h3>
+                
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab('generate')">Generate</div>
+                    <div class="tab" onclick="switchTab('upload')">Upload Only</div>
+                </div>
+                
+                <!-- Generate and Upload Tab -->
+                <div id="generate-tab" class="tab-content active">
+                    <form id="generateForm">
+                        <div class="form-group">
+                            <label for="requirements">Code Requirements</label>
+                            <textarea id="requirements" placeholder="Describe what you want to build...
+Example: Create a Python FastAPI REST API with user authentication, CRUD operations for a todo list, and SQLite database integration. Include error handling and logging." required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="language">Programming Language</label>
+                            <select id="language" required>
+                                <option value="python">Python</option>
+                                <option value="javascript">JavaScript</option>
+                                <option value="typescript">TypeScript</option>
+                                <option value="java">Java</option>
+                                <option value="go">Go</option>
+                                <option value="rust">Rust</option>
+                                <option value="csharp">C#</option>
+                                <option value="cpp">C++</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="framework">Framework (Optional)</label>
+                            <input type="text" id="framework" placeholder="e.g., FastAPI, React, Express, Django">
+                        </div>
+                        
+                        <button type="submit" class="btn" id="generateBtn">
+                            🎯 Generate & Prepare for Upload
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Upload Only Tab -->
+                <div id="upload-tab" class="tab-content">
+                    <form id="uploadOnlyForm">
+                        <div class="form-group">
+                            <label for="files">Upload Files</label>
+                            <input type="file" id="files" multiple accept=".py,.js,.ts,.java,.go,.rs,.cs,.cpp,.html,.css,.md">
+                            <small style="color: #666; margin-top: 5px; display: block;">
+                                Select multiple files to upload to your repository
+                            </small>
+                        </div>
+                        
+                        <button type="button" class="btn" onclick="prepareManualUpload()">
+                            📁 Prepare Files for Upload
+                        </button>
+                    </form>
+                </div>
+                
+                <div id="codeOutput" class="code-output" style="display: none;"></div>
+                
+                <div id="generateStatus" class="status-area"></div>
+            </div>
+            
+            <!-- GitHub Upload Panel -->
+            <div class="panel">
+                <h3>📦 GitHub Upload</h3>
+                
+                <div class="github-info">
+                    <h4>🔑 GitHub Configuration</h4>
+                    <p>Make sure your GitHub token is configured in the .env file</p>
+                    <p>Repository will be created if it doesn't exist</p>
+                </div>
+                
+                <form id="githubForm">
+                    <div class="form-group">
+                        <label for="owner">GitHub Username/Organization</label>
+                        <input type="text" id="owner" placeholder="your-github-username" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="repository">Repository Name</label>
+                        <input type="text" id="repository" placeholder="my-awesome-project" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="branch">Branch</label>
+                        <input type="text" id="branch" value="main" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="commitMessage">Commit Message</label>
+                        <input type="text" id="commitMessage" value="Add generated code from SEAgent" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="createPR" style="width: auto; margin-right: 8px;">
+                            Create Pull Request
+                        </label>
+                    </div>
+                    
+                    <div id="prOptions" style="display: none;">
+                        <div class="form-group">
+                            <label for="prTitle">PR Title</label>
+                            <input type="text" id="prTitle" placeholder="Add new features">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="prDescription">PR Description</label>
+                            <textarea id="prDescription" placeholder="Describe the changes..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success" id="uploadBtn" disabled>
+                        🚀 Upload to GitHub
+                    </button>
+                </form>
+                
+                <div id="uploadStatus" class="status-area"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let generatedFiles = {};
+        let manualFiles = {};
+        
+        // API Configuration
+        const API_BASE = window.location.origin;
+        
+        // Tab switching
+        function switchTab(tabName) {
+            // Remove active class from all tabs and contents
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // Add active class to selected tab and content
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Reset form states
+            resetForms();
+        }
+        
+        // Reset forms and status
+        function resetForms() {
+            generatedFiles = {};
+            manualFiles = {};
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('codeOutput').style.display = 'none';
+            hideStatus('generateStatus');
+            hideStatus('uploadStatus');
+        }
+        
+        // Show/hide PR options
+        document.getElementById('createPR').addEventListener('change', function() {
+            const prOptions = document.getElementById('prOptions');
+            prOptions.style.display = this.checked ? 'block' : 'none';
+        });
+        
+        // Generate code form submission
+        document.getElementById('generateForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const requirements = document.getElementById('requirements').value;
+            const language = document.getElementById('language').value;
+            const framework = document.getElementById('framework').value;
+            
+            showStatus('generateStatus', 'info', '🔄 Generating code with AI...');
+            setButtonLoading('generateBtn', true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        requirements: requirements,
+                        language: language,
+                        framework: framework
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('generateStatus', 'info', '⏳ Code generation started...');
+                    
+                    // Poll for task completion
+                    pollTaskStatus(result.task_id, 'generate');
+                } else {
+                    throw new Error(result.detail || 'Generation failed');
+                }
+            } catch (error) {
+                showStatus('generateStatus', 'error', `❌ Generation failed: ${error.message}`);
+                setButtonLoading('generateBtn', false);
+            }
+        });
+        
+        // GitHub upload form submission
+        document.getElementById('githubForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const owner = document.getElementById('owner').value;
+            const repository = document.getElementById('repository').value;
+            const branch = document.getElementById('branch').value;
+            const commitMessage = document.getElementById('commitMessage').value;
+            const createPR = document.getElementById('createPR').checked;
+            const prTitle = document.getElementById('prTitle').value;
+            const prDescription = document.getElementById('prDescription').value;
+            
+            // Determine which files to upload
+            const filesToUpload = Object.keys(generatedFiles).length > 0 ? generatedFiles : manualFiles;
+            
+            if (Object.keys(filesToUpload).length === 0) {
+                showStatus('uploadStatus', 'error', '❌ No files to upload. Generate code or select files first.');
+                return;
+            }
+            
+            showStatus('uploadStatus', 'info', '🚀 Uploading to GitHub...');
+            setButtonLoading('uploadBtn', true);
+            
+            try {
+                const uploadData = {
+                    repository_name: repository,
+                    owner: owner,
+                    files: filesToUpload,
+                    commit_message: commitMessage,
+                    branch: branch,
+                    create_pr: createPR,
+                    pr_title: prTitle,
+                    pr_description: prDescription
+                };
+                
+                const response = await fetch(`${API_BASE}/api/v1/github/upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(uploadData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('uploadStatus', 'info', '⏳ Upload started...');
+                    
+                    // Poll for task completion
+                    pollTaskStatus(result.task_id, 'upload');
+                } else {
+                    throw new Error(result.detail || 'Upload failed');
+                }
+            } catch (error) {
+                showStatus('uploadStatus', 'error', `❌ Upload failed: ${error.message}`);
+                setButtonLoading('uploadBtn', false);
+            }
+        });
+        
+        // Prepare manual upload
+        function prepareManualUpload() {
+            const fileInput = document.getElementById('files');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                showStatus('generateStatus', 'error', '❌ Please select files to upload.');
+                return;
+            }
+            
+            manualFiles = {};
+            let filesProcessed = 0;
+            
+            showStatus('generateStatus', 'info', '📁 Reading selected files...');
+            
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    manualFiles[file.name] = e.target.result;
+                    filesProcessed++;
+                    
+                    if (filesProcessed === files.length) {
+                        // All files processed
+                        displayFiles(manualFiles);
+                        document.getElementById('uploadBtn').disabled = false;
+                        showStatus('generateStatus', 'success', `✅ ${filesProcessed} files ready for upload.`);
+                    }
+                };
+                
+                reader.readAsText(file);
+            });
+        }
+        
+        // Poll task status
+        async function pollTaskStatus(taskId, type) {
+            const maxAttempts = 30;
+            let attempts = 0;
+            
+            const poll = async () => {
+                attempts++;
+                
+                try {
+                    const response = await fetch(`${API_BASE}/api/v1/tasks/${taskId}`);
+                    const result = await response.json();
+                    
+                    if (response.ok && result.task) {
+                        const task = result.task;
+                        
+                        if (task.status === 'completed') {
+                            handleTaskComplete(type, task);
+                        } else if (task.status === 'failed') {
+                            throw new Error(task.error || 'Task failed');
+                        } else if (attempts < maxAttempts) {
+                            // Continue polling
+                            setTimeout(poll, 2000);
+                        } else {
+                            throw new Error('Task timeout');
+                        }
+                    } else {
+                        throw new Error('Failed to check task status');
+                    }
+                } catch (error) {
+                    const statusId = type === 'generate' ? 'generateStatus' : 'uploadStatus';
+                    const buttonId = type === 'generate' ? 'generateBtn' : 'uploadBtn';
+                    
+                    showStatus(statusId, 'error', `❌ ${error.message}`);
+                    setButtonLoading(buttonId, false);
+                }
+            };
+            
+            setTimeout(poll, 2000);
+        }
+        
+        // Handle task completion
+        function handleTaskComplete(type, task) {
+            if (type === 'generate') {
+                // Code generation completed
+                const result = task.result;
+                
+                if (result && result.generated_code) {
+                    // Extract files from generated code
+                    generatedFiles = {};
+                    
+                    if (typeof result.generated_code === 'string') {
+                        // Single file
+                        const language = document.getElementById('language').value;
+                        const extension = getFileExtension(language);
+                        generatedFiles[`main${extension}`] = result.generated_code;
+                    } else if (result.files) {
+                        // Multiple files
+                        generatedFiles = result.files;
+                    } else {
+                        // Fallback
+                        const language = document.getElementById('language').value;
+                        const extension = getFileExtension(language);
+                        generatedFiles[`generated${extension}`] = JSON.stringify(result, null, 2);
+                    }
+                    
+                    displayFiles(generatedFiles);
+                    document.getElementById('uploadBtn').disabled = false;
+                    showStatus('generateStatus', 'success', `✅ Code generated successfully! ${Object.keys(generatedFiles).length} files ready.`);
+                } else {
+                    showStatus('generateStatus', 'error', '❌ No code was generated.');
+                }
+                
+                setButtonLoading('generateBtn', false);
+                
+            } else if (type === 'upload') {
+                // Upload completed
+                const result = task.result;
+                
+                if (result && result.upload_status === 'success') {
+                    let message = `✅ Successfully uploaded to ${result.repository}!`;
+                    
+                    if (result.pr_created) {
+                        message += `\n🔀 Pull request created: #${result.pr_number}`;
+                    }
+                    
+                    showStatus('uploadStatus', 'success', message);
+                } else {
+                    showStatus('uploadStatus', 'success', '✅ Upload completed (simulated mode)');
+                }
+                
+                setButtonLoading('uploadBtn', false);
+            }
+        }
+        
+        // Display generated files
+        function displayFiles(files) {
+            const output = document.getElementById('codeOutput');
+            let content = '';
+            
+            Object.entries(files).forEach(([filename, code]) => {
+                content += `// ==================== ${filename} ====================\n\n`;
+                content += code;
+                content += '\n\n';
+            });
+            
+            output.textContent = content;
+            output.style.display = 'block';
+        }
+        
+        // Utility functions
+        function showStatus(elementId, type, message) {
+            const element = document.getElementById(elementId);
+            element.className = `status-area status-${type}`;
+            element.textContent = message;
+            element.style.display = 'block';
+        }
+        
+        function hideStatus(elementId) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'none';
+        }
+        
+        function setButtonLoading(buttonId, loading) {
+            const button = document.getElementById(buttonId);
+            const originalText = button.textContent;
+            
+            if (loading) {
+                button.innerHTML = '<span class="loading"></span>Processing...';
+                button.disabled = true;
+            } else {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+        
+        function getFileExtension(language) {
+            const extensions = {
+                'python': '.py',
+                'javascript': '.js',
+                'typescript': '.ts',
+                'java': '.java',
+                'go': '.go',
+                'rust': '.rs',
+                'csharp': '.cs',
+                'cpp': '.cpp'
+            };
+            return extensions[language] || '.txt';
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set default values
+            document.getElementById('owner').value = 'navicharan';
+            document.getElementById('repository').value = 'seagent-generated';
+        });
+    </script>
+</body>
+</html>

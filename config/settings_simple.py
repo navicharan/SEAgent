@@ -50,16 +50,17 @@ class APIConfig:
 
 
 @dataclass
-class OpenAIConfig:
-    """OpenAI API configuration - secured with environment variables"""
-    api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
-    model: str = field(default_factory=lambda: os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"))
-    max_tokens: int = field(default_factory=lambda: int(os.getenv("OPENAI_MAX_TOKENS", "2000")))
-    temperature: float = field(default_factory=lambda: float(os.getenv("OPENAI_TEMPERATURE", "0.7")))
+class DeepSeekConfig:
+    """DeepSeek-Coder V2 API configuration - secured with environment variables"""
+    api_key: str = field(default_factory=lambda: os.getenv("DEEPSEEK_API_KEY", ""))
+    model: str = field(default_factory=lambda: os.getenv("DEEPSEEK_MODEL", "deepseek-coder"))
+    base_url: str = field(default_factory=lambda: os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
+    max_tokens: int = field(default_factory=lambda: int(os.getenv("DEEPSEEK_MAX_TOKENS", "4000")))
+    temperature: float = field(default_factory=lambda: float(os.getenv("DEEPSEEK_TEMPERATURE", "0.7")))
     
     def is_configured(self) -> bool:
-        """Check if OpenAI is properly configured"""
-        return bool(self.api_key and self.api_key.startswith("sk-"))
+        """Check if DeepSeek is properly configured"""
+        return bool(self.api_key and len(self.api_key) > 10)
 
 
 @dataclass
@@ -124,7 +125,7 @@ class Settings:
         
         # Set default values
         self.api = APIConfig()
-        self.openai = OpenAIConfig()
+        self.deepseek = DeepSeekConfig()
         self.ui = UIConfig()
         self.database = DatabaseConfig()
         self.redis = RedisConfig()
@@ -151,7 +152,7 @@ class Settings:
                         if isinstance(value, str) and not value.startswith('your-') and value != 'sk-proj-...':
                             os.environ[key] = value
                 
-                # Load OpenAI configuration
+                # Load DeepSeek configuration
                 if 'openai' in config_data:
                     openai_data = config_data['openai']
                     self.openai.api_key = openai_data.get('api_key', os.getenv('OPENAI_API_KEY', ''))

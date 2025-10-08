@@ -1,6 +1,6 @@
 """
 Code Generation Agent - Intelligent code generation with context awareness
-Enhanced with secure OpenAI integration
+Enhanced with secure DeepSeek-Coder V2 integration
 """
 
 import asyncio
@@ -10,19 +10,20 @@ from typing import Dict, Any, List
 from pathlib import Path
 
 from .base_agent import BaseAgent, AgentCapability
+from config.deepseek_client import DeepSeekClient
 
-# Set OpenAI as unavailable for now to avoid hanging
-OPENAI_AVAILABLE = False
+# Try to import OpenAI for DeepSeek compatibility
+DEEPSEEK_AVAILABLE = False
 openai = None
 
-# Try to import OpenAI safely
 try:
     import openai
-    OPENAI_AVAILABLE = True
+    from openai import OpenAI
+    DEEPSEEK_AVAILABLE = True
 except ImportError:
-    print("OpenAI not installed. Code generation will run in simulation mode.")
+    print("OpenAI package not available for DeepSeek integration. Code generation will run in simulation mode.")
 except Exception as e:
-    print(f"OpenAI import failed: {e}. Code generation will run in simulation mode.")
+    print(f"DeepSeek integration failed: {e}. Code generation will run in simulation mode.")
 
 
 class CodeGenerationAgent(BaseAgent):
@@ -92,61 +93,71 @@ class CodeGenerationAgent(BaseAgent):
         }
     
     async def _load_models(self):
-        """Load AI models for code generation with secure configuration"""
-        # Initialize OpenAI if available (non-blocking)
-        self.openai_client = None
+        """Load AI models for code generation with secure DeepSeek configuration"""
+        # Initialize DeepSeek client if available (non-blocking)
+        self.deepseek_client = None
         
-        if OPENAI_AVAILABLE:
+        if DEEPSEEK_AVAILABLE:
             try:
                 # Get API key from environment or config (securely)
-                api_key = os.getenv('OPENAI_API_KEY')
+                api_key = os.getenv('DEEPSEEK_API_KEY', '').strip()
+                base_url = os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com').strip()
+                model = os.getenv('DEEPSEEK_MODEL', 'deepseek-coder').strip()
+                
+                self.logger.debug(f"DeepSeek API key found: {bool(api_key)}")
                 
                 if not api_key:
                     # Try to get from secure config
                     try:
                         from config.settings_simple import Settings
                         settings = Settings()
-                        if hasattr(settings, 'openai') and settings.openai.is_configured():
-                            api_key = settings.openai.api_key
+                        if hasattr(settings, 'deepseek') and settings.deepseek.is_configured():
+                            api_key = settings.deepseek.api_key.strip()
+                            base_url = settings.deepseek.base_url.strip()
+                            model = settings.deepseek.model.strip()
+                            self.logger.debug("DeepSeek config loaded from settings")
                     except Exception as e:
                         self.logger.debug(f"Could not load config: {e}")
                 
-                if api_key and api_key.startswith('sk-'):
-                    # Initialize OpenAI client securely
-                    from openai import OpenAI
-                    self.openai_client = OpenAI(api_key=api_key)
+                if api_key and len(api_key) > 10:
+                    # Initialize DeepSeek client
+                    self.deepseek_client = DeepSeekClient(
+                        api_key=api_key,
+                        base_url=base_url,
+                        model=model
+                    )
+                    self.logger.info("DeepSeek-Coder V2 client initialized successfully")
                     
                     # Load configuration
                     try:
                         settings = Settings() if 'settings' not in locals() else settings
-                        self.openai_config = {
-                            'model': settings.openai.model,
-                            'max_tokens': settings.openai.max_tokens,
-                            'temperature': settings.openai.temperature
+                        self.deepseek_config = {
+                            'model': settings.deepseek.model,
+                            'max_tokens': settings.deepseek.max_tokens,
+                            'temperature': settings.deepseek.temperature
                         }
                     except:
                         # Fallback configuration
-                        self.openai_config = {
-                            'model': 'gpt-3.5-turbo',
-                            'max_tokens': 2000,
+                        self.deepseek_config = {
+                            'model': 'deepseek-coder',
+                            'max_tokens': 4000,
                             'temperature': 0.7
                         }
-                    
-                    self.logger.info("OpenAI client initialized successfully")
+                        
                 else:
-                    self.logger.warning("OpenAI API key not found or invalid - using simulation mode")
+                    self.logger.warning(f"DeepSeek API key not found or invalid - using simulation mode")
                     
             except Exception as e:
-                self.logger.warning(f"OpenAI initialization failed: {e} - using simulation mode")
-                self.openai_client = None
+                self.logger.warning(f"DeepSeek initialization failed: {e} - using simulation mode")
+                self.deepseek_client = None
         else:
-            self.logger.warning("OpenAI not available - using simulation mode")
+            self.logger.warning("DeepSeek not available - using simulation mode")
         
         # Load model configuration (non-blocking)
         specific_config = self.config.specific_config
         self.model_config = {
-            'primary_model': specific_config.get('primary_model', 'gpt-4'),
-            'code_model': specific_config.get('code_model', 'code-davinci'),
+            'primary_model': specific_config.get('primary_model', 'deepseek-coder'),
+            'code_model': specific_config.get('code_model', 'deepseek-coder'),
             'temperature': specific_config.get('temperature', 0.1),
             'max_tokens': specific_config.get('max_tokens', 2000)
         }
@@ -184,12 +195,22 @@ class CodeGenerationAgent(BaseAgent):
         framework = parameters.get('framework', '')
         context = parameters.get('context', {})
         
+        # Ensure all parameters are valid strings
+        if not requirements:
+            requirements = "Basic code generation"
+        if not language:
+            language = 'python'
+        if framework is None:
+            framework = ''
+        
         self.logger.info(f"Generating code for: {requirements[:100]}...")
         
-        # Use OpenAI if available, otherwise fallback to simulation
-        if self.openai_client:
+        # Use DeepSeek if available, otherwise fallback to simulation
+        if self.deepseek_client:
+            self.logger.info("Using DeepSeek-Coder V2 for code generation")
             generated_code = await self._generate_code_with_ai(requirements, language, framework, context)
         else:
+            self.logger.info("DeepSeek client not available, using simulation mode")
             generated_code = await self._simulate_code_generation(requirements, language, framework, context)
         
         return {
@@ -305,61 +326,67 @@ class CodeGenerationAgent(BaseAgent):
         }
     
     async def _generate_code_with_ai(self, requirements: str, language: str, framework: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate code using OpenAI API"""
+        """Generate code using DeepSeek-Coder V2 API"""
         try:
-            # Construct the prompt
+            # Construct the prompt optimized for DeepSeek-Coder V2
             prompt = self._build_code_generation_prompt(requirements, language, framework, context)
             
-            # Make API call to OpenAI using the new client format
-            response = await asyncio.to_thread(
-                self.openai_client.chat.completions.create,
-                model=self.openai_config['model'],
-                messages=[
-                    {"role": "system", "content": "You are an expert software engineer. Generate high-quality, well-documented code based on the requirements. Always provide working, complete code with proper error handling."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=self.openai_config['max_tokens'],
-                temperature=self.openai_config['temperature']
+            self.logger.info(f"Calling DeepSeek-Coder V2 for code generation")
+            
+            # Use DeepSeek client for code generation
+            result = await self.deepseek_client.generate_code(
+                prompt=prompt,
+                max_tokens=self.deepseek_config['max_tokens'],
+                temperature=self.deepseek_config['temperature']
             )
             
-            # Extract and parse the response
-            generated_content = response.choices[0].message.content
-            
-            # Parse the response to extract code, explanation, etc.
-            return self._parse_ai_response(generated_content, language, framework)
+            if result['success']:
+                self.logger.info("DeepSeek-Coder V2 API call successful, parsing response...")
+                # Parse the response to extract code, explanation, etc.
+                return self._parse_ai_response(result['code'], language, framework)
+            else:
+                raise Exception("DeepSeek API returned unsuccessful result")
             
         except Exception as e:
-            self.logger.error(f"OpenAI code generation failed: {e}")
+            self.logger.error(f"DeepSeek code generation failed: {e}")
+            self.logger.info("Falling back to simulation mode")
             # Fallback to simulation
             return await self._simulate_code_generation(requirements, language, framework, context)
     
     def _build_code_generation_prompt(self, requirements: str, language: str, framework: str, context: Dict[str, Any]) -> str:
-        """Build a comprehensive prompt for code generation"""
+        """Build a comprehensive prompt optimized for DeepSeek-Coder V2"""
         prompt = f"""
-Generate {language} code that implements the following requirements:
+You are DeepSeek-Coder V2, a specialized AI model for coding tasks. Generate high-quality, production-ready code based on these requirements:
 
-Requirements: {requirements}
+**Requirements**: {requirements}
 
-Programming Language: {language}
-Framework: {framework if framework else 'None specified'}
+**Technical Specifications**:
+- Programming Language: {language}
+- Framework: {framework if framework else 'None specified - choose the best one'}
+- Include proper error handling, logging, and documentation
+- Follow best practices and coding standards for {language}
+- Make the code secure, efficient, and maintainable
+- Use modern patterns and optimize for performance
 
-Please provide:
-1. Complete, working code
-2. Proper error handling
-3. Clear comments and documentation
-4. Best practices for {language}
-5. Any necessary imports or dependencies
+**Additional Context**: {json.dumps(context, indent=2) if context else 'None provided'}
 
-Additional Context: {json.dumps(context, indent=2) if context else 'None'}
+**Please provide a complete implementation that includes**:
+1. Working, tested code with proper structure and organization
+2. Clear comments and comprehensive documentation
+3. Robust error handling and input validation
+4. Any necessary imports and dependencies
+5. Example usage if applicable
 
-Format your response as a JSON object with the following structure:
+**Response Format**: Provide your response as JSON with this exact structure:
 {{
-    "code": "the generated code here",
-    "explanation": "explanation of what the code does",
-    "files": ["list of files that would be created"],
-    "dependencies": ["list of required dependencies"],
+    "code": "// Complete implementation here",
+    "explanation": "Detailed explanation of the solution",
+    "files": ["list of files that should be created"],
+    "dependencies": ["required packages/libraries"],
     "quality_score": 0.95
 }}
+
+Focus on creating functional, maintainable code that solves the requirements completely.
 """
         return prompt
     
@@ -401,6 +428,10 @@ Format your response as a JSON object with the following structure:
     async def _simulate_code_generation(self, requirements: str, language: str, framework: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Simulate AI-powered code generation"""
         # This would be replaced with actual AI model calls
+        
+        # Ensure requirements is not None
+        if not requirements:
+            requirements = "Basic code generation"
         
         if 'calculator' in requirements.lower():
             code = '''
@@ -524,6 +555,10 @@ import {framework}
     
     def _get_file_extension(self, language: str) -> str:
         """Get file extension for language"""
+        # Ensure language is not None
+        if not language:
+            language = 'python'
+            
         extensions = {
             'python': 'py',
             'javascript': 'js',
@@ -535,17 +570,23 @@ import {framework}
     
     def _get_dependencies(self, language: str, framework: str) -> List[str]:
         """Get typical dependencies for language/framework"""
+        # Ensure parameters are not None
+        if not language:
+            language = 'python'
+        if not framework:
+            framework = ''
+            
         if language.lower() == 'python':
-            if framework.lower() == 'django':
+            if framework and framework.lower() == 'django':
                 return ['django', 'djangorestframework']
-            elif framework.lower() == 'flask':
+            elif framework and framework.lower() == 'flask':
                 return ['flask', 'flask-restful']
             else:
                 return ['requests', 'pytest']
         elif language.lower() == 'javascript':
-            if framework.lower() == 'react':
+            if framework and framework.lower() == 'react':
                 return ['react', 'react-dom']
-            elif framework.lower() == 'node':
+            elif framework and framework.lower() == 'node':
                 return ['express', 'lodash']
             else:
                 return ['lodash']
