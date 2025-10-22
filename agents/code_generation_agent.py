@@ -29,6 +29,31 @@ except Exception as e:
 class CodeGenerationAgent(BaseAgent):
     """Agent responsible for intelligent code generation and modification"""
     
+    def __init__(self, config: Dict[str, Any]):
+        super().__init__(config)
+        self.deepseek_client = None
+        self.use_simulation = True  # Default to simulation mode
+        
+        # Initialize deepseek_config with default values
+        # Handle both dict and AgentConfig object
+        if hasattr(config, 'specific_config'):
+            # AgentConfig object
+            specific = config.specific_config
+            self.deepseek_config = {
+                'max_tokens': specific.get('max_tokens', 4000),
+                'temperature': specific.get('temperature', 0.7),
+                'model': specific.get('model', 'openai/gpt-3.5-turbo'),
+                'base_url': specific.get('base_url', 'https://openrouter.ai/api/v1')
+            }
+        else:
+            # Dict object
+            self.deepseek_config = {
+                'max_tokens': config.get('max_tokens', 4000),
+                'temperature': config.get('temperature', 0.7),
+                'model': config.get('model', 'openai/gpt-3.5-turbo'),
+                'base_url': config.get('base_url', 'https://openrouter.ai/api/v1')
+            }
+    
     async def _setup_capabilities(self):
         """Setup code generation capabilities"""
         self.capabilities = {
@@ -93,76 +118,40 @@ class CodeGenerationAgent(BaseAgent):
         }
     
     async def _load_models(self):
-        """Load AI models for code generation with secure DeepSeek configuration"""
-        # Initialize DeepSeek client if available (non-blocking)
-        self.deepseek_client = None
-        
-        if DEEPSEEK_AVAILABLE:
-            try:
-                # Get API key from environment or config (securely)
-                api_key = os.getenv('DEEPSEEK_API_KEY', '').strip()
-                base_url = os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com').strip()
-                model = os.getenv('DEEPSEEK_MODEL', 'deepseek-coder').strip()
+        """Initialize AI models with proper OpenRouter configuration"""
+        try:
+            # Get configuration from environment
+            api_key = os.getenv('DEEPSEEK_API_KEY', '').strip()
+            base_url = os.getenv('DEEPSEEK_BASE_URL', 'https://openrouter.ai/api/v1').strip()
+            model = os.getenv('DEEPSEEK_MODEL', 'openai/gpt-3.5-turbo').strip()
+            
+            if not api_key:
+                self.logger.warning("No DEEPSEEK_API_KEY found. Code generation will use simulation mode.")
+                self.use_simulation = True
+                return
+            
+            # Initialize DeepSeek client with OpenRouter configuration
+            self.deepseek_client = DeepSeekClient(
+                api_key=api_key,
+                base_url=base_url,
+                model=model
+            )
+            
+            # Test the connection
+            test_result = self.deepseek_client.test_connection()
+            if test_result['success']:
+                self.logger.info(f"Successfully connected to {model} via OpenRouter")
+                self.use_simulation = False
+            else:
+                self.logger.error(f"Failed to connect to DeepSeek API: {test_result.get('error', 'Unknown error')}")
+                self.logger.info("Falling back to simulation mode")
+                self.use_simulation = True
                 
-                self.logger.debug(f"DeepSeek API key found: {bool(api_key)}")
-                
-                if not api_key:
-                    # Try to get from secure config
-                    try:
-                        from config.settings_simple import Settings
-                        settings = Settings()
-                        if hasattr(settings, 'deepseek') and settings.deepseek.is_configured():
-                            api_key = settings.deepseek.api_key.strip()
-                            base_url = settings.deepseek.base_url.strip()
-                            model = settings.deepseek.model.strip()
-                            self.logger.debug("DeepSeek config loaded from settings")
-                    except Exception as e:
-                        self.logger.debug(f"Could not load config: {e}")
-                
-                if api_key and len(api_key) > 10:
-                    # Initialize DeepSeek client
-                    self.deepseek_client = DeepSeekClient(
-                        api_key=api_key,
-                        base_url=base_url,
-                        model=model
-                    )
-                    self.logger.info("DeepSeek-Coder V2 client initialized successfully")
-                    
-                    # Load configuration
-                    try:
-                        settings = Settings() if 'settings' not in locals() else settings
-                        self.deepseek_config = {
-                            'model': settings.deepseek.model,
-                            'max_tokens': settings.deepseek.max_tokens,
-                            'temperature': settings.deepseek.temperature
-                        }
-                    except:
-                        # Fallback configuration
-                        self.deepseek_config = {
-                            'model': 'deepseek-coder',
-                            'max_tokens': 4000,
-                            'temperature': 0.7
-                        }
-                        
-                else:
-                    self.logger.warning(f"DeepSeek API key not found or invalid - using simulation mode")
-                    
-            except Exception as e:
-                self.logger.warning(f"DeepSeek initialization failed: {e} - using simulation mode")
-                self.deepseek_client = None
-        else:
-            self.logger.warning("DeepSeek not available - using simulation mode")
-        
-        # Load model configuration (non-blocking)
-        specific_config = self.config.specific_config
-        self.model_config = {
-            'primary_model': specific_config.get('primary_model', 'deepseek-coder'),
-            'code_model': specific_config.get('code_model', 'deepseek-coder'),
-            'temperature': specific_config.get('temperature', 0.1),
-            'max_tokens': specific_config.get('max_tokens', 2000)
-        }
-        self.logger.info(f"Model configuration loaded: {self.model_config}")
-    
+        except Exception as e:
+            self.logger.error(f"Error loading DeepSeek model: {str(e)}")
+            self.logger.info("Falling back to simulation mode")
+            self.use_simulation = True
+
     async def _setup_resources(self):
         """Setup additional resources for code generation"""
         # Setup code templates, patterns, best practices database
@@ -334,7 +323,7 @@ class CodeGenerationAgent(BaseAgent):
             self.logger.info(f"Calling DeepSeek-Coder V2 for code generation")
             
             # Use DeepSeek client for code generation
-            result = await self.deepseek_client.generate_code(
+            result = self.deepseek_client.generate_code(
                 prompt=prompt,
                 max_tokens=self.deepseek_config['max_tokens'],
                 temperature=self.deepseek_config['temperature']

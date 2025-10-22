@@ -4,286 +4,226 @@ Enhanced with secure API integration for coding tasks
 """
 
 import os
+import json
 import logging
 from typing import Dict, Any, Optional, List
-import json
+import requests
+from dataclasses import dataclass
 
-# Try to import OpenAI (we'll use it for DeepSeek's OpenAI-compatible API)
-DEEPSEEK_AVAILABLE = False
-openai = None
+logger = logging.getLogger(__name__)
 
-try:
-    import openai
-    from openai import OpenAI
-    DEEPSEEK_AVAILABLE = True
-except ImportError as e:
-    print("OpenAI package not available for DeepSeek integration. Code generation will run in simulation mode.")
-except Exception as e:
-    print(f"DeepSeek integration failed: {e}. Code generation will run in simulation mode.")
-
+@dataclass
+class DeepSeekConfig:
+    api_key: str
+    base_url: str = "https://openrouter.ai/api/v1"  # Updated for OpenRouter
+    model: str = "openai/gpt-3.5-turbo"  # Updated to standard OpenRouter model
+    max_tokens: int = 4000
+    temperature: float = 0.7
 
 class DeepSeekClient:
-    """
-    DeepSeek-Coder V2 client wrapper using OpenAI-compatible API
-    Specialized for coding tasks with Mixture-of-Experts architecture
-    """
-    
-    def __init__(self, api_key: str, base_url: str = "https://api.deepseek.com", model: str = "deepseek-coder"):
+    def __init__(self, api_key: str, base_url: str = "https://openrouter.ai/api/v1", 
+                 model: str = "openai/gpt-3.5-turbo"):
         self.api_key = api_key
-        self.base_url = base_url
+        self.base_url = base_url.rstrip('/')
         self.model = model
-        self.logger = logging.getLogger(__name__)
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:8000",  # Required for OpenRouter
+            "X-Title": "SEAgent"  # Optional but recommended for OpenRouter
+        }
         
-        if DEEPSEEK_AVAILABLE and api_key:
-            self.client = OpenAI(
-                api_key=api_key,
-                base_url=base_url
-            )
-            self.logger.info("DeepSeek-Coder V2 client initialized successfully")
-        else:
-            self.client = None
-            self.logger.warning("DeepSeek-Coder V2 client not available - running in simulation mode")
-    
-    async def generate_code(self, prompt: str, max_tokens: int = 4000, temperature: float = 0.7) -> Dict[str, Any]:
-        """
-        Generate code using DeepSeek-Coder V2
-        
-        Args:
-            prompt: The coding prompt/request
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature for creativity vs consistency
-            
-        Returns:
-            Dictionary with generated code and metadata
-        """
-        if not self.client:
-            return await self._simulate_code_generation(prompt)
-        
+    def generate_code(self, prompt: str, language: str = "python", 
+                     max_tokens: int = 4000, temperature: float = 0.7) -> Dict[str, Any]:
+        """Generate code using DeepSeek model via OpenRouter"""
         try:
-            # Use DeepSeek-Coder V2 for specialized coding tasks
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system", 
-                        "content": "You are DeepSeek-Coder V2, a specialized AI model for coding tasks. "
-                                 "Generate clean, efficient, and well-documented code. "
-                                 "Use best practices and modern patterns. "
-                                 "Include proper error handling and comments."
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature,
-                stream=False
-            )
-            
-            generated_code = response.choices[0].message.content
-            
-            return {
-                "code": generated_code,
+            # Enhanced prompt for better code generation
+            enhanced_prompt = f"""
+You are an expert software engineer specializing in {language}. 
+Generate clean, well-documented, production-ready code based on the following requirements:
+
+{prompt}
+
+Requirements:
+- Write complete, functional code
+- Include proper error handling
+- Add comprehensive comments
+- Follow {language} best practices
+- Ensure code is ready for production use
+
+Generate only the code without additional explanations unless specifically requested.
+"""
+
+            payload = {
                 "model": self.model,
-                "tokens_used": response.usage.total_tokens if response.usage else 0,
-                "success": True,
-                "source": "deepseek-coder-v2"
-            }
-            
-        except Exception as e:
-            self.logger.error(f"DeepSeek API error: {e}")
-            return await self._simulate_code_generation(prompt)
-    
-    async def analyze_code(self, code: str, analysis_type: str = "security") -> Dict[str, Any]:
-        """
-        Analyze code for security, performance, or quality issues
-        
-        Args:
-            code: The code to analyze
-            analysis_type: Type of analysis (security, performance, quality)
-            
-        Returns:
-            Dictionary with analysis results
-        """
-        if not self.client:
-            return await self._simulate_code_analysis(code, analysis_type)
-        
-        try:
-            analysis_prompts = {
-                "security": "Analyze this code for security vulnerabilities, potential exploits, and security best practices. Provide specific recommendations.",
-                "performance": "Analyze this code for performance bottlenecks, optimization opportunities, and efficiency improvements.",
-                "quality": "Analyze this code for code quality, maintainability, readability, and adherence to best practices."
-            }
-            
-            prompt = f"{analysis_prompts.get(analysis_type, analysis_prompts['quality'])}\n\nCode:\n{code}"
-            
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
+                "messages": [
                     {
                         "role": "system",
-                        "content": f"You are DeepSeek-Coder V2, analyzing code for {analysis_type}. "
-                                 "Provide detailed, actionable analysis with specific recommendations."
+                        "content": f"You are an expert {language} developer. Generate clean, production-ready code with proper error handling and documentation."
                     },
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "user", 
+                        "content": enhanced_prompt
+                    }
                 ],
-                max_tokens=2000,
-                temperature=0.3  # Lower temperature for analysis tasks
-            )
-            
-            analysis_result = response.choices[0].message.content
-            
-            return {
-                "analysis": analysis_result,
-                "type": analysis_type,
-                "model": self.model,
-                "success": True,
-                "source": "deepseek-coder-v2"
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "stream": False
             }
             
-        except Exception as e:
-            self.logger.error(f"DeepSeek analysis error: {e}")
-            return await self._simulate_code_analysis(code, analysis_type)
-    
-    async def fix_code(self, code: str, error_message: str) -> Dict[str, Any]:
-        """
-        Fix code based on error messages
-        
-        Args:
-            code: The problematic code
-            error_message: Error message or description
+            logger.info(f"Sending request to {self.base_url}/chat/completions with model {self.model}")
             
-        Returns:
-            Dictionary with fixed code and explanation
-        """
-        if not self.client:
-            return await self._simulate_code_fix(code, error_message)
-        
-        try:
-            prompt = f"""Fix the following code that has this error: {error_message}
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=self.headers,
+                json=payload,
+                timeout=60
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'choices' in data and len(data['choices']) > 0:
+                    generated_code = data['choices'][0]['message']['content']
+                    logger.info(f"Successfully generated {len(generated_code)} characters of code")
+                    return {
+                        'success': True,
+                        'code': generated_code,
+                        'model': self.model,
+                        'usage': data.get('usage', {}),
+                        'language': language
+                    }
+                else:
+                    logger.error(f"No choices in response: {data}")
+                    return {
+                        'success': False,
+                        'error': 'No code generated in response',
+                        'response': data
+                    }
+            else:
+                logger.error(f"API request failed: {response.status_code} - {response.text}")
+                return {
+                    'success': False,
+                    'error': f'API request failed: {response.status_code}',
+                    'details': response.text
+                }
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request exception: {str(e)}")
+            return {
+                'success': False,
+                'error': f'Request failed: {str(e)}'
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error in generate_code: {str(e)}")
+            return {
+                'success': False,
+                'error': f'Unexpected error: {str(e)}'
+            }
 
-Original Code:
+    def analyze_code(self, code: str, language: str = "python") -> Dict[str, Any]:
+        """Analyze code for security, performance, and best practices"""
+        try:
+            prompt = f"""
+Analyze the following {language} code and provide detailed feedback on:
+1. Security vulnerabilities
+2. Performance optimizations
+3. Code quality and best practices
+4. Potential bugs or issues
+5. Improvement suggestions
+
+Code to analyze:
+```{language}
 {code}
+```
 
-Please provide the corrected code with explanations of the changes made."""
+Provide a structured analysis with specific recommendations.
+"""
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
+            payload = {
+                "model": self.model,
+                "messages": [
                     {
                         "role": "system",
-                        "content": "You are DeepSeek-Coder V2, specialized in debugging and fixing code. "
-                                 "Provide corrected code with clear explanations of changes."
+                        "content": f"You are an expert code reviewer specializing in {language}. Provide thorough analysis of security, performance, and code quality."
                     },
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
                 ],
-                max_tokens=3000,
-                temperature=0.2  # Very low temperature for fixing
+                "max_tokens": 3000,
+                "temperature": 0.3
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=self.headers,
+                json=payload,
+                timeout=60
             )
             
-            fix_result = response.choices[0].message.content
+            if response.status_code == 200:
+                data = response.json()
+                if 'choices' in data and len(data['choices']) > 0:
+                    analysis = data['choices'][0]['message']['content']
+                    return {
+                        'success': True,
+                        'analysis': analysis,
+                        'model': self.model
+                    }
             
             return {
-                "fixed_code": fix_result,
-                "original_error": error_message,
-                "model": self.model,
-                "success": True,
-                "source": "deepseek-coder-v2"
+                'success': False,
+                'error': f'Analysis failed: {response.status_code}',
+                'details': response.text if response else 'No response'
             }
             
         except Exception as e:
-            self.logger.error(f"DeepSeek fix error: {e}")
-            return await self._simulate_code_fix(code, error_message)
-    
-    async def generate_tests(self, code: str, test_framework: str = "pytest") -> Dict[str, Any]:
-        """
-        Generate test cases for given code
-        
-        Args:
-            code: The code to generate tests for
-            test_framework: Testing framework to use
-            
-        Returns:
-            Dictionary with generated test code
-        """
-        if not self.client:
-            return await self._simulate_test_generation(code, test_framework)
-        
+            logger.error(f"Error in analyze_code: {str(e)}")
+            return {
+                'success': False,
+                'error': f'Analysis error: {str(e)}'
+            }
+
+    def test_connection(self) -> Dict[str, Any]:
+        """Test the API connection"""
         try:
-            prompt = f"""Generate comprehensive test cases for the following code using {test_framework}:
-
-{code}
-
-Include:
-1. Unit tests for all functions/methods
-2. Edge cases and boundary conditions
-3. Error handling tests
-4. Mock external dependencies if needed
-5. Clear test documentation"""
-
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"You are DeepSeek-Coder V2, generating comprehensive test cases using {test_framework}. "
-                                 "Create thorough, maintainable tests with good coverage."
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=3000,
-                temperature=0.4
-            )
-            
-            test_code = response.choices[0].message.content
-            
-            return {
-                "test_code": test_code,
-                "framework": test_framework,
+            payload = {
                 "model": self.model,
-                "success": True,
-                "source": "deepseek-coder-v2"
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Hello, please respond with 'Connection successful'"
+                    }
+                ],
+                "max_tokens": 50,
+                "temperature": 0
             }
             
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=self.headers,
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    'success': True,
+                    'message': 'Connection successful',
+                    'model': self.model,
+                    'response': data.get('choices', [{}])[0].get('message', {}).get('content', '')
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Connection failed: {response.status_code}',
+                    'details': response.text
+                }
+                
         except Exception as e:
-            self.logger.error(f"DeepSeek test generation error: {e}")
-            return await self._simulate_test_generation(code, test_framework)
-    
-    # Simulation methods for fallback
-    async def _simulate_code_generation(self, prompt: str) -> Dict[str, Any]:
-        """Simulate code generation when DeepSeek is not available"""
-        return {
-            "code": f"# Generated code for: {prompt[:50]}...\n# DeepSeek-Coder V2 simulation mode\n\ndef example_function():\n    # TODO: Implement based on requirements\n    pass",
-            "model": "simulation",
-            "tokens_used": 0,
-            "success": True,
-            "source": "simulation"
-        }
-    
-    async def _simulate_code_analysis(self, code: str, analysis_type: str) -> Dict[str, Any]:
-        """Simulate code analysis when DeepSeek is not available"""
-        return {
-            "analysis": f"Simulated {analysis_type} analysis:\n- Code structure looks good\n- Consider adding error handling\n- Review for optimization opportunities",
-            "type": analysis_type,
-            "model": "simulation",
-            "success": True,
-            "source": "simulation"
-        }
-    
-    async def _simulate_code_fix(self, code: str, error_message: str) -> Dict[str, Any]:
-        """Simulate code fixing when DeepSeek is not available"""
-        return {
-            "fixed_code": f"# Fixed code (simulation)\n{code}\n# Applied simulated fix for: {error_message}",
-            "original_error": error_message,
-            "model": "simulation",
-            "success": True,
-            "source": "simulation"
-        }
-    
-    async def _simulate_test_generation(self, code: str, test_framework: str) -> Dict[str, Any]:
-        """Simulate test generation when DeepSeek is not available"""
-        return {
-            "test_code": f"# Generated tests using {test_framework} (simulation)\nimport {test_framework}\n\ndef test_example():\n    # TODO: Implement actual tests\n    assert True",
-            "framework": test_framework,
-            "model": "simulation",
-            "success": True,
-            "source": "simulation"
-        }
+            return {
+                'success': False,
+                'error': f'Connection test failed: {str(e)}'
+            }

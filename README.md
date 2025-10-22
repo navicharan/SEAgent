@@ -1,6 +1,6 @@
 # SEAgent - Autonomous Software Engineering Agent System
 
-🤖 **SEAgent** is a comprehensive autonomous software engineering application powered by **DeepSeek-Coder V2**, addressing critical limitations in current multi-agent LLM systems for automated software development. It provides enterprise-grade capabilities including security analysis, debugging mechanisms, agent collaboration, and real-world integration.
+🤖 **SEAgent** is a multi-agent software engineering system powered by **OpenAI GPT models**, providing automated code generation, security analysis, debugging, and performance optimization through specialized AI agents. It features a FastAPI-based architecture with web dashboard for monitoring and control.
 
 ## 🎯 Problem Statement
 
@@ -14,15 +14,15 @@ Current multi-agent LLM systems for automated software development face several 
 
 ## 🚀 Solution Overview
 
-SEAgent provides a sophisticated multi-agent architecture powered by DeepSeek-Coder V2 with:
+SEAgent provides a multi-agent architecture powered by OpenAI GPT models with:
 
 - **6 Specialized Agents**: Code Generation, Security Analysis, Debug, Performance, Integration, and Testing
-- **AI-Powered Code Generation**: Leveraging DeepSeek-Coder V2's Mixture-of-Experts architecture
+- **AI-Powered Code Generation**: Leveraging OpenAI GPT-3.5-turbo and GPT-4 models
 - **Central Orchestrator**: Manages task coordination, workflows, and inter-agent communication
-- **Enterprise Integration**: CI/CD platforms, version control, deployment tools
-- **Comprehensive Security**: Static analysis, vulnerability detection, compliance checking
-- **Real-time Monitoring**: Web dashboard with metrics, logs, and system health
-- **RESTful API**: External integration and automation capabilities
+- **GitHub Integration**: Repository management, code upload, and version control
+- **Security Analysis**: Static code analysis and vulnerability detection
+- **Web Dashboard**: Real-time monitoring interface served via FastAPI
+- **RESTful API**: Comprehensive endpoints for external integration
 
 ## 🏗️ Architecture
 
@@ -41,20 +41,19 @@ SEAgent/
 
 | Agent | Primary Functions | Key Features |
 |-------|------------------|--------------|
-| **Code Generation** | Generate code, APIs, schemas | DeepSeek-Coder V2, Multi-language support, framework integration |
-| **Security Analysis** | Vulnerability scanning, compliance | AI-enhanced analysis, OWASP/CWE standards, static analysis |
-| **Debug** | Error analysis, fix suggestions | Automated debugging, root cause analysis |
-| **Performance** | Optimization, profiling | AI-powered optimization, Bottleneck detection, performance metrics |
-| **Integration** | CI/CD, deployment | GitHub/GitLab, Jenkins, Docker, K8s |
-| **Testing** | Unit/integration tests | AI test generation, Multi-framework, coverage analysis |
+| **Code Generation** | Generate code, APIs, schemas | OpenAI GPT models, Multi-language support, context-aware generation |
+| **Security Analysis** | Vulnerability scanning, compliance | Pattern-based analysis, OWASP/CWE standards, static analysis |
+| **Debug** | Error analysis, fix suggestions | Automated debugging, error pattern recognition |
+| **Performance** | Optimization, profiling | Performance analysis, bottleneck detection |
+| **Integration** | CI/CD, deployment | GitHub integration, repository management |
+| **Testing** | Unit/integration tests | Test generation, framework support |
 
 ## 📋 Prerequisites
 
 - **Python 3.9+**
-- **DeepSeek API Key** (for AI-powered code generation)
+- **OpenAI API Key** (for AI-powered code generation)
 - **Git** (for version control integration)
 - **Docker** (optional, for containerized deployment)
-- **Redis** (optional, for distributed task queues)
 
 ## 🛠️ Installation
 
@@ -79,21 +78,14 @@ Copy the example configuration:
 cp .env.example .env
 ```
 
-Edit `.env` with your DeepSeek API key:
+Edit `.env` with your OpenAI API key:
 
 ```bash
-# DeepSeek-Coder V2 Configuration
-DEEPSEEK_API_KEY=your-deepseek-api-key-here
-DEEPSEEK_MODEL=deepseek-coder
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-agents:
-  code_generation:
-    enabled: true
-    primary_model: "gpt-4"
-  
-  security_analysis:
-    enabled: true
-    scan_depth: "deep"
+# OpenAI Configuration
+OPENAI_API_KEY=your-openai-api-key-here
+SECRET_KEY=your-secret-key-for-production
+API_HOST=0.0.0.0
+API_PORT=8000
 ```
 
 ### 4. Environment Variables (Optional)
@@ -122,7 +114,8 @@ python main.py
 
 This will launch:
 - **API Server** on `http://localhost:8000`
-- **Web Dashboard** on `http://localhost:8001`
+- **Web Dashboard** on `http://localhost:8000/dashboard`
+- **GitHub Integration** on `http://localhost:8000/github`
 
 ### Basic Usage Examples
 
@@ -197,7 +190,7 @@ asyncio.run(run_full_workflow())
 
 ## 🖥️ Web Dashboard
 
-Access the web dashboard at `http://localhost:8001` for:
+Access the web dashboard at `http://localhost:8000/dashboard` for:
 
 - **Real-time Monitoring**: Agent status, task progress, system metrics
 - **Task Management**: Create, monitor, and manage tasks
@@ -223,14 +216,27 @@ The REST API provides programmatic access to all SEAgent functionality:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `GET` | `/` | API status and information |
+| `GET` | `/health` | Health check endpoint |
+| `GET` | `/dashboard` | Web dashboard interface |
+| `GET` | `/github` | GitHub integration interface |
 | `POST` | `/api/v1/projects` | Create new project |
+| `GET` | `/api/v1/projects` | List all projects |
 | `GET` | `/api/v1/projects/{id}` | Get project details |
 | `POST` | `/api/v1/tasks` | Submit new task |
 | `GET` | `/api/v1/tasks/{id}` | Get task status |
-| `POST` | `/api/v1/workflows/{name}` | Execute workflow |
-| `GET` | `/api/v1/agents/status` | Get all agent status |
+| `POST` | `/api/v1/workflows/execute` | Execute workflow |
+| `GET` | `/api/v1/workflows` | List available workflows |
+| `POST` | `/api/v1/generate` | Generate code |
 | `POST` | `/api/v1/security/scan` | Run security scan |
-| `POST` | `/api/v1/performance/analyze` | Analyze performance |
+| `POST` | `/api/v1/debug` | Debug code issues |
+| `POST` | `/api/v1/test` | Generate and run tests |
+| `GET` | `/api/v1/agents/status` | Get all agent status |
+| `GET` | `/api/v1/agents/{name}/capabilities` | Get agent capabilities |
+| `GET` | `/api/v1/stats` | Get system statistics |
+| `GET` | `/api/v1/config` | Get system configuration |
+| `POST` | `/api/v1/github/upload` | Upload code to GitHub |
+| `POST` | `/api/v1/github/create-repository` | Create GitHub repository |
 
 ### API Usage Examples
 
@@ -260,7 +266,7 @@ curl "http://localhost:8000/api/v1/tasks/task-id"
 
 ### Agent Customization
 
-Each agent can be configured with specific settings:
+Each agent can be configured in `config/config.yaml`:
 
 ```yaml
 agents:
@@ -272,70 +278,70 @@ agents:
       primary_model: "gpt-4"
       temperature: 0.1
       max_tokens: 2000
-      supported_languages: ["python", "javascript", "typescript"]
       
   security_analysis:
     enabled: true
     specific_config:
       scan_depth: "deep"
-      compliance_standards: ["OWASP", "CWE", "NIST"]
-      vulnerability_sources: ["nvd", "ghsa", "snyk"]
+      compliance_standards: ["OWASP", "CWE"]
+      vulnerability_db_update: true
 ```
 
 ### Integration Settings
 
-Configure external tool integrations:
+Configure external tool integrations in `config/config.yaml`:
 
 ```yaml
+# OpenAI Configuration
+openai:
+  model: "gpt-3.5-turbo"
+  max_tokens: 2000
+  temperature: 0.7
+
+# GitHub Integration
 integrations:
   github:
-    enabled: true
-    token: "${GITHUB_TOKEN}"
-    auto_create_pr: true
+    enabled: false
+    token: null  # Set via SEAGENT_GITHUB_TOKEN environment variable
+    organization: null
+    auto_create_pr: false
     
   docker:
     enabled: true
-    registry: "your-registry.com"
-    auto_build: true
-    
-  kubernetes:
-    enabled: true
-    namespace: "seagent"
-    auto_deploy: false
+    registry: "docker.io"
+    auto_build: false
 ```
 
 ### Performance Tuning
 
-Optimize for your deployment environment:
+Optimize for your deployment environment in `config/config.yaml`:
 
 ```yaml
-# High-performance configuration
-max_concurrent_tasks: 20
-task_timeout: 600
+# Performance configuration
+task_timeout: 300
+max_concurrent_tasks: 10
 
-redis:
-  host: "redis-cluster.example.com"
-  max_connections: 50
-
+# Database Configuration (SQLite by default)
 database:
-  url: "postgresql://user:pass@db.example.com/seagent"
-  pool_size: 20
+  url: "sqlite:///seagent.db"
+  echo: false
+  pool_size: 5
+
+# API Configuration
+api:
+  host: 0.0.0.0
+  port: 8000
+  max_request_size: 10485760  # 10MB
+  rate_limit: 100
 ```
 
 ## 📚 Examples
 
-Run the comprehensive examples:
-
-```bash
-python examples/usage_examples.py
-```
-
-This demonstrates:
-- Individual agent capabilities
-- Multi-agent workflows
-- Error handling and debugging
-- Performance optimization
-- Security analysis workflows
+Access the web interface at `http://localhost:8000/github` for:
+- GitHub repository integration
+- Code upload and management
+- Project creation and organization
+- Real-time agent task monitoring
 
 ## 🧪 Testing
 
