@@ -522,6 +522,13 @@ class GitHubDeepIntegration:
         if not GITHUB_AVAILABLE:
             return await self._simulate_file_upload(repo_name, owner, files)
         
+        if not self.github:
+            return {
+                'status': 'error',
+                'error': 'GitHub authentication not configured. Please set GITHUB_TOKEN environment variable.',
+                'help': 'See GITHUB_SETUP.md for detailed instructions.'
+            }
+        
         try:
             repo = self.github.get_repo(f"{owner}/{repo_name}")
             
@@ -579,9 +586,35 @@ class GitHubDeepIntegration:
                 'files_count': len(uploaded_files)
             }
             
+        except GithubException as e:
+            error_msg = f"GitHub API error: {e.data.get('message', str(e))}"
+            
+            if e.status == 404:
+                error_msg = f"Repository '{owner}/{repo_name}' not found. Please check:\n" \
+                          f"1. Repository exists\n" \
+                          f"2. Repository name is correct\n" \
+                          f"3. Your token has access to this repository"
+            elif e.status == 401:
+                error_msg = "GitHub authentication failed. Please check your GITHUB_TOKEN."
+            elif e.status == 403:
+                error_msg = f"Access forbidden to '{owner}/{repo_name}'. Your token may not have required permissions."
+            
+            logging.error(f"GitHub file upload failed: {error_msg}")
+            return {
+                'status': 'error',
+                'error': error_msg,
+                'repository': f"{owner}/{repo_name}",
+                'help': 'See GITHUB_SETUP.md for troubleshooting.'
+            }
+            
         except Exception as e:
             logging.error(f"GitHub file upload failed: {e}")
-            return await self._simulate_file_upload(repo_name, owner, files)
+            return {
+                'status': 'error',
+                'error': f"Upload failed: {str(e)}",
+                'repository': f"{owner}/{repo_name}",
+                'help': 'Check your network connection and repository settings.'
+            }
     
     async def create_repository(self, name: str, description: str, private: bool = False,
                               auto_init: bool = True, gitignore_template: str = None,

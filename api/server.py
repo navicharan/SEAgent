@@ -824,6 +824,51 @@ class APIServer:
                 self.logger.error(f"GitHub upload failed: {e}")
                 raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
         
+        @self.app.post("/api/v1/github/upload/direct")
+        async def upload_to_github_direct(request: GitHubUploadRequest):
+            """Upload files to GitHub repository directly (no task queue)"""
+            try:
+                # Get the integration agent
+                integration_agent = self.coordinator.agents.get('integration')
+                if not integration_agent:
+                    raise HTTPException(status_code=503, detail="Integration agent not available")
+                
+                # Execute GitHub upload directly
+                result = await integration_agent.execute_task({
+                    "task_type": "github_upload",
+                    "repository_name": request.repository_name,
+                    "owner": request.owner,
+                    "files": request.files,
+                    "commit_message": request.commit_message,
+                    "branch": request.branch,
+                    "create_pr": request.create_pr,
+                    "pr_title": request.pr_title,
+                    "pr_description": request.pr_description
+                })
+                
+                # Check if upload failed
+                if result.get('status') == 'error':
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=result.get('error', 'GitHub upload failed')
+                    )
+                
+                return {
+                    "success": True,
+                    "status": "completed",
+                    "result": result,
+                    "repository": f"{request.owner}/{request.repository_name}",
+                    "files_uploaded": result.get('files_uploaded', []),
+                    "commit_sha": result.get('commit_sha'),
+                    "commit_url": result.get('commit_url')
+                }
+                
+            except HTTPException:
+                raise
+            except Exception as e:
+                self.logger.error(f"GitHub upload failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        
         @self.app.post("/api/v1/github/create-repository")
         async def create_github_repository(request: GitHubCreateRepoRequest):
             """Create a new GitHub repository"""

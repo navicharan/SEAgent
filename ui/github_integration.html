@@ -326,8 +326,12 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
                 
                 <div class="github-info">
                     <h4>🔑 GitHub Configuration</h4>
-                    <p>Make sure your GitHub token is configured in the .env file</p>
-                    <p>Repository will be created if it doesn't exist</p>
+                    <div id="authStatus" style="padding: 10px; margin: 10px 0; border-radius: 5px; background: #fff3cd; border: 1px solid #ffeaa7;">
+                        ⚠️ <strong>Setup Required:</strong> 
+                        <a href="GITHUB_SETUP.md" target="_blank" style="color: #d73a49;">Configure GitHub Token</a> 
+                        to enable uploads
+                    </div>
+                    <p>Repository must exist or you need permissions to create it</p>
                 </div>
                 
                 <form id="githubForm">
@@ -491,7 +495,7 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
                     pr_description: prDescription
                 };
                 
-                const response = await fetch(`${API_BASE}/api/v1/github/upload`, {
+                const response = await fetch(`${API_BASE}/api/v1/github/upload/direct`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -501,13 +505,35 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
                 
                 const result = await response.json();
                 
-                if (response.ok) {
-                    showStatus('uploadStatus', 'info', '⏳ Upload started...');
+                if (response.ok && result.success) {
+                    const uploadResult = result.result;
+                    showStatus('uploadStatus', 'success', 
+                        `✅ Upload successful! ${uploadResult.files_uploaded?.length || 0} files uploaded.`);
                     
-                    // Poll for task completion
-                    pollTaskStatus(result.task_id, 'upload');
+                    if (uploadResult.commit_url) {
+                        const linkHtml = `<a href="${uploadResult.commit_url}" target="_blank" style="color: #0366d6;">View commit</a>`;
+                        showStatus('uploadStatus', 'success', 
+                            `✅ Upload successful! ${linkHtml}`);
+                    }
+                    
+                    if (uploadResult.pr_url) {
+                        const prLinkHtml = `<a href="${uploadResult.pr_url}" target="_blank" style="color: #0366d6;">View Pull Request</a>`;
+                        showStatus('uploadStatus', 'success', 
+                            `✅ Upload and PR created! ${prLinkHtml}`);
+                    }
                 } else {
-                    throw new Error(result.detail || 'Upload failed');
+                    const errorDetail = result.detail || result.error || 'Upload failed';
+                    
+                    // Check for authentication issues
+                    if (errorDetail.includes('GITHUB_TOKEN') || errorDetail.includes('authentication')) {
+                        showStatus('uploadStatus', 'error', 
+                            `❌ ${errorDetail}<br>📖 <a href="GITHUB_SETUP.md" target="_blank" style="color: #d73a49;">See setup guide</a>`);
+                    } else if (errorDetail.includes('not found')) {
+                        showStatus('uploadStatus', 'error', 
+                            `❌ ${errorDetail}<br>💡 Make sure the repository exists and you have access.`);
+                    } else {
+                        showStatus('uploadStatus', 'error', `❌ ${errorDetail}`);
+                    }
                 }
             } catch (error) {
                 showStatus('uploadStatus', 'error', `❌ Upload failed: ${error.message}`);
