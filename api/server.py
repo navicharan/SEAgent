@@ -559,6 +559,66 @@ class APIServer:
                 "message": "Code generation started"
             }
         
+        @self.app.post("/api/v1/generate/direct")
+        async def generate_code_direct(request: CodeGenerationRequest):
+            """Direct code generation endpoint that returns code immediately"""
+            try:
+                # Get the code generation agent directly
+                code_agent = self.coordinator.agents.get('code_generation')
+                if not code_agent:
+                    raise HTTPException(status_code=503, detail="Code generation agent not available")
+                
+                # Prepare parameters for the agent
+                parameters = {
+                    "task_type": "generate_code",
+                    "requirements": request.requirements,
+                    "language": request.language,
+                    "framework": request.framework,
+                    "context": request.context
+                }
+                
+                # Call the agent's execute_task method
+                result = await asyncio.wait_for(
+                    code_agent.execute_task(parameters),
+                    timeout=60.0
+                )
+                
+                # Process the result - the agent returns a dict with code, explanation, etc.
+                if isinstance(result, dict) and result.get("code"):
+                    return {
+                        "success": True,
+                        "code": result.get("code", ""),
+                        "explanation": result.get("explanation", ""),
+                        "language": request.language,
+                        "framework": request.framework,
+                        "files": result.get("files", []),
+                        "dependencies": result.get("dependencies", []),
+                        "quality_score": result.get("quality_score", 0),
+                        "metadata": {
+                            "generated_at": datetime.utcnow().isoformat(),
+                            "agent": "code_generation",
+                            "model": "deepseek-coder-v2"
+                        }
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "No code generated",
+                        "code": "",
+                        "explanation": "Failed to generate code - empty result"
+                    }
+                    
+            except asyncio.TimeoutError:
+                raise HTTPException(status_code=408, detail="Code generation timed out")
+            except Exception as e:
+                self.logger.error(f"Direct code generation error: {e}")
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "code": "",
+                    "explanation": f"Generation failed: {e}"
+                }
+        
         @self.app.post("/api/v1/security/scan")
         async def security_scan(request: SecurityScanRequest):
             parameters = {

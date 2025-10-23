@@ -429,7 +429,7 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
             setButtonLoading('generateBtn', true);
             
             try {
-                const response = await fetch(`${API_BASE}/api/v1/generate`, {
+                const response = await fetch(`${API_BASE}/api/v1/generate/direct`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -437,19 +437,18 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
                     body: JSON.stringify({
                         requirements: requirements,
                         language: language,
-                        framework: framework
+                        framework: framework,
+                        context: {}
                     })
                 });
                 
                 const result = await response.json();
                 
-                if (response.ok) {
-                    showStatus('generateStatus', 'info', '⏳ Code generation started...');
-                    
-                    // Poll for task completion
-                    pollTaskStatus(result.task_id, 'generate');
+                if (response.ok && result.success) {
+                    // Handle direct response - no polling needed
+                    handleDirectCodeGeneration(result, language);
                 } else {
-                    throw new Error(result.detail || 'Generation failed');
+                    throw new Error(result.error || result.detail || 'Generation failed');
                 }
             } catch (error) {
                 showStatus('generateStatus', 'error', `❌ Generation failed: ${error.message}`);
@@ -548,6 +547,48 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
                 
                 reader.readAsText(file);
             });
+        }
+        
+        // Handle direct code generation response
+        function handleDirectCodeGeneration(result, language) {
+            // Extract the actual code from the response
+            let codeContent = result.code;
+            
+            // If the code is wrapped in JSON format, extract it
+            if (codeContent.includes('```json') && codeContent.includes('"code":')) {
+                try {
+                    // Extract JSON content between ```json and ```
+                    const jsonMatch = codeContent.match(/```json\n([\s\S]*?)\n```/);
+                    if (jsonMatch) {
+                        const jsonData = JSON.parse(jsonMatch[1]);
+                        codeContent = jsonData.code || codeContent;
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse JSON code format, using raw content');
+                }
+            }
+            
+            // Create files object
+            generatedFiles = {};
+            const extension = getFileExtension(language);
+            
+            if (result.files && result.files.length > 0) {
+                // Multiple files from response
+                result.files.forEach((file, index) => {
+                    const fileName = file.name || `file${index}${extension}`;
+                    generatedFiles[fileName] = file.content || codeContent;
+                });
+            } else {
+                // Single file
+                generatedFiles[`main${extension}`] = codeContent;
+            }
+            
+            // Display the generated code
+            displayFiles(generatedFiles);
+            document.getElementById('uploadBtn').disabled = false;
+            
+            showStatus('generateStatus', 'success', `✅ Code generated successfully! ${Object.keys(generatedFiles).length} files ready.`);
+            setButtonLoading('generateBtn', false);
         }
         
         // Poll task status
