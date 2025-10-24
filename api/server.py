@@ -45,6 +45,22 @@ class CodeGenerationRequest(BaseModel):
     context: Dict[str, Any] = {}
 
 
+class CodeGenerationWithEvaluationRequest(BaseModel):
+    requirements: str
+    language: str
+    framework: Optional[str] = None
+    context: Dict[str, Any] = {}
+    run_evaluation: bool = True
+
+
+class EvaluationRequest(BaseModel):
+    code: str
+    language: str = "python"
+    evaluation_type: str = "comprehensive"  # "humaneval", "securityeval", "comprehensive"
+    problem_ids: Optional[List[str]] = None
+    security_categories: Optional[List[str]] = None
+
+
 class SecurityScanRequest(BaseModel):
     source_code: Optional[str] = None
     project_id: Optional[str] = None
@@ -438,7 +454,7 @@ class APIServer:
             </html>
             """
             return HTMLResponse(content=html_content)
-        
+
         # Projects
         @self.app.post("/api/v1/projects")
         async def create_project(request: ProjectCreateRequest):
@@ -557,6 +573,222 @@ class APIServer:
                 "task_id": task_id,
                 "status": "generating",
                 "message": "Code generation started"
+            }
+        
+        @self.app.post("/api/generate-with-evaluation")
+        async def generate_code_with_evaluation(request: CodeGenerationWithEvaluationRequest):
+            """Generate code and automatically evaluate with HumanEval and SecurityEval"""
+            try:
+                # Get the code generation agent directly
+                code_agent = self.coordinator.agents.get('code_generation')
+                if not code_agent:
+                    raise HTTPException(status_code=503, detail="Code generation agent not available")
+                
+                # Prepare parameters for the agent
+                parameters = {
+                    "task_type": "generate_with_evaluation",
+                    "requirements": request.requirements,
+                    "language": request.language,
+                    "framework": request.framework,
+                    "context": request.context,
+                    "run_evaluation": request.run_evaluation
+                }
+                
+                # Call the agent's execute_task method
+                result = await asyncio.wait_for(
+                    code_agent.execute_task(parameters),
+                    timeout=120.0  # Extended timeout for evaluation
+                )
+                
+                if isinstance(result, dict):
+                    return {
+                        "success": True,
+                        "code": result.get("code", ""),
+                        "explanation": result.get("explanation", ""),
+                        "language": request.language,
+                        "framework": request.framework,
+                        "files": result.get("files", []),
+                        "dependencies": result.get("dependencies", []),
+                        "quality_score": result.get("quality_score", 0),
+                        "evaluation_results": result.get("evaluation_results", {}),
+                        "recommendations": result.get("recommendations", []),
+                        "metadata": {
+                            "generated_at": datetime.utcnow().isoformat(),
+                            "agent": "code_generation",
+                            "evaluation_enabled": request.run_evaluation
+                        }
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Invalid result format",
+                        "code": "",
+                        "explanation": "Generation failed - invalid result format"
+                    }
+                    
+            except asyncio.TimeoutError:
+                raise HTTPException(status_code=408, detail="Code generation and evaluation timed out")
+            except Exception as e:
+                self.logger.error(f"Generate with evaluation error: {e}")
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "code": "",
+                    "explanation": f"Generation failed: {e}"
+                }
+        
+        @self.app.post("/api/v1/evaluate")
+        async def evaluate_code(request: EvaluationRequest):
+            """Evaluate existing code with HumanEval and SecurityEval"""
+            try:
+                # Check if evaluation engine is available
+                code_agent = self.coordinator.agents.get('code_generation')
+                if not code_agent or not hasattr(code_agent, 'evaluation_engine') or not code_agent.evaluation_engine:
+                    raise HTTPException(status_code=503, detail="Evaluation engine not available")
+                
+                evaluation_engine = code_agent.evaluation_engine
+                
+                # Prepare parameters based on evaluation type
+                parameters = {
+                    "code": request.code,
+                    "language": request.language
+                }
+                
+                if request.evaluation_type == "humaneval":
+                    parameters["task_type"] = "evaluate_humaneval"
+                    if request.problem_ids:
+                        parameters["problem_ids"] = request.problem_ids
+                elif request.evaluation_type == "securityeval":
+                    parameters["task_type"] = "evaluate_securityeval"
+                    if request.security_categories:
+                        parameters["security_categories"] = request.security_categories
+                else:  # comprehensive
+                    parameters["task_type"] = "comprehensive_evaluation"
+                    parameters["evaluation_config"] = {
+                        "weights": {
+                            "correctness": 0.4,
+                            "security": 0.4,
+                            "performance": 0.2
+                        }
+                    }
+                
+                # Execute evaluation
+                result = await asyncio.wait_for(
+                    evaluation_engine.execute_task(parameters),
+                    timeout=60.0
+                )
+                
+                return {
+                    "success": True,
+                    "evaluation_type": request.evaluation_type,
+                    "code": request.code,
+                    "language": request.language,
+                    "results": result,
+                    "evaluated_at": datetime.utcnow().isoformat()
+                }
+                
+            except asyncio.TimeoutError:
+                raise HTTPException(status_code=408, detail="Code evaluation timed out")
+            except Exception as e:
+                self.logger.error(f"Code evaluation error: {e}")
+                raise HTTPException(status_code=500, detail=f"Evaluation failed: {str(e)}")
+        
+        @self.app.get("/api/v1/evaluation/datasets")
+        async def get_evaluation_datasets():
+            """Get information about available evaluation datasets"""
+            try:
+                code_agent = self.coordinator.agents.get('code_generation')
+                if not code_agent or not hasattr(code_agent, 'evaluation_engine') or not code_agent.evaluation_engine:
+                    raise HTTPException(status_code=503, detail="Evaluation engine not available")
+                
+                evaluation_engine = code_agent.evaluation_engine
+                
+                # Get dataset information
+                humaneval_count = len(evaluation_engine.humaneval_dataset) if hasattr(evaluation_engine, 'humaneval_dataset') else 0
+                securityeval_count = len(evaluation_engine.securityeval_dataset) if hasattr(evaluation_engine, 'securityeval_dataset') else 0
+                
+                return {
+                    "datasets": {
+                        "humaneval": {
+                            "name": "HumanEval",
+                            "description": "Evaluates functional correctness of code",
+                            "total_problems": humaneval_count,
+                            "categories": ["algorithms", "data_structures", "math", "string_processing"],
+                            "languages": ["python"]
+                        },
+                        "securityeval": {
+                            "name": "SecurityEval", 
+                            "description": "Evaluates security vulnerabilities and compliance",
+                            "total_problems": securityeval_count,
+                            "categories": ["input_validation", "authentication", "file_operations", "sql_operations", "crypto_operations"],
+                            "languages": ["python"]
+                        }
+                    },
+                    "evaluation_types": [
+                        {
+                            "type": "humaneval",
+                            "name": "HumanEval Correctness",
+                            "description": "Tests functional correctness and algorithmic accuracy"
+                        },
+                        {
+                            "type": "securityeval", 
+                            "name": "SecurityEval Compliance",
+                            "description": "Tests security vulnerabilities and compliance"
+                        },
+                        {
+                            "type": "comprehensive",
+                            "name": "Comprehensive Analysis",
+                            "description": "Combined correctness, security, and performance evaluation"
+                        }
+                    ]
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Dataset info error: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to get dataset info: {str(e)}")
+        
+        @self.app.get("/api/v1/evaluation/metrics")
+        async def get_evaluation_metrics():
+            """Get detailed evaluation metrics and scoring methodology"""
+            return {
+                "scoring_methodology": {
+                    "overall_score": {
+                        "description": "Weighted combination of correctness, security, and performance",
+                        "weights": {
+                            "correctness": 0.4,
+                            "security": 0.4,
+                            "performance": 0.2
+                        },
+                        "range": "0-100"
+                    },
+                    "correctness_score": {
+                        "description": "Percentage of HumanEval tests passed",
+                        "calculation": "(passed_tests / total_tests) * 100",
+                        "range": "0-100"
+                    },
+                    "security_score": {
+                        "description": "Security vulnerability assessment",
+                        "factors": ["vulnerability_count", "severity_weights", "compliance_checks"],
+                        "range": "0-100"
+                    },
+                    "performance_score": {
+                        "description": "Code execution efficiency",
+                        "factors": ["execution_time", "memory_usage", "algorithmic_complexity"],
+                        "range": "0-100"
+                    }
+                },
+                "vulnerability_severities": {
+                    "critical": {"weight": 25, "color": "#8e44ad", "description": "Immediate security risk"},
+                    "high": {"weight": 15, "color": "#e74c3c", "description": "Significant security risk"},
+                    "medium": {"weight": 10, "color": "#f39c12", "description": "Moderate security risk"},
+                    "low": {"weight": 5, "color": "#f1c40f", "description": "Low security risk"}
+                },
+                "performance_benchmarks": {
+                    "excellent": {"threshold": "< 0.1s", "score_range": "90-100"},
+                    "good": {"threshold": "0.1-0.5s", "score_range": "70-89"},
+                    "acceptable": {"threshold": "0.5-1.0s", "score_range": "50-69"},
+                    "poor": {"threshold": "> 1.0s", "score_range": "0-49"}
+                }
             }
         
         @self.app.post("/api/v1/generate/direct")

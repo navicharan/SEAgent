@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .base_agent import BaseAgent, AgentCapability
 from config.deepseek_client import DeepSeekClient
+from .evaluation_engine import EvaluationEngine
 
 # Try to import OpenAI for DeepSeek compatibility
 DEEPSEEK_AVAILABLE = False
@@ -33,6 +34,7 @@ class CodeGenerationAgent(BaseAgent):
         super().__init__(config)
         self.deepseek_client = None
         self.use_simulation = True  # Default to simulation mode
+        self.evaluation_engine = None  # Will be initialized during setup
         
         # Initialize deepseek_config with default values
         # Handle both dict and AgentConfig object
@@ -101,6 +103,24 @@ class CodeGenerationAgent(BaseAgent):
                     'coverage_estimate': 'number'
                 }
             ),
+            'generate_with_evaluation': AgentCapability(
+                name='generate_with_evaluation',
+                description='Generate code and automatically evaluate it with HumanEval and SecurityEval',
+                input_schema={
+                    'requirements': 'string',
+                    'language': 'string',
+                    'framework': 'string (optional)',
+                    'context': 'object (optional)',
+                    'run_evaluation': 'boolean (optional, default: true)'
+                },
+                output_schema={
+                    'code': 'string',
+                    'explanation': 'string',
+                    'files': 'array',
+                    'dependencies': 'array',
+                    'evaluation_results': 'object'
+                }
+            ),
             'fix_code': AgentCapability(
                 name='fix_code',
                 description='Fix code based on error reports or security findings',
@@ -158,6 +178,15 @@ class CodeGenerationAgent(BaseAgent):
         self.code_templates = await self._load_code_templates()
         self.best_practices = await self._load_best_practices()
         self.code_patterns = await self._load_code_patterns()
+        
+        # Initialize evaluation engine
+        try:
+            self.evaluation_engine = EvaluationEngine(self.config)
+            await self.evaluation_engine.initialize()
+            self.logger.info("Evaluation engine initialized successfully")
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize evaluation engine: {e}")
+            self.evaluation_engine = None
     
     async def execute_task(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a code generation task"""
@@ -168,6 +197,8 @@ class CodeGenerationAgent(BaseAgent):
         
         if task_type == 'generate_code':
             return await self._generate_code(parameters)
+        elif task_type == 'generate_with_evaluation':
+            return await self._generate_code_with_evaluation(parameters)
         elif task_type == 'refactor_code':
             return await self._refactor_code(parameters)
         elif task_type == 'generate_tests':
@@ -211,6 +242,87 @@ class CodeGenerationAgent(BaseAgent):
             'framework': framework,
             'quality_score': generated_code['quality_score']
         }
+    
+    async def _generate_code_with_evaluation(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate code and automatically evaluate it with HumanEval and SecurityEval"""
+        # First generate the code using existing method
+        generate_result = await self._generate_code(parameters)
+        
+        # Get evaluation settings
+        run_evaluation = parameters.get('run_evaluation', True)
+        
+        if not run_evaluation or not self.evaluation_engine:
+            return {
+                **generate_result,
+                'evaluation_results': {
+                    'evaluation_enabled': False,
+                    'message': 'Evaluation engine not available or disabled'
+                }
+            }
+        
+        self.logger.info("Running comprehensive evaluation on generated code...")
+        
+        try:
+            # Run comprehensive evaluation
+            evaluation_result = await self.evaluation_engine.execute_task({
+                'task_type': 'comprehensive_evaluation',
+                'code': generate_result['code'],
+                'language': generate_result['language'],
+                'evaluation_config': {
+                    'weights': {
+                        'correctness': 0.4,
+                        'security': 0.4,
+                        'performance': 0.2
+                    }
+                }
+            })
+            
+            # Enhance the result with evaluation metrics
+            enhanced_result = {
+                **generate_result,
+                'evaluation_results': {
+                    'evaluation_enabled': True,
+                    'overall_score': evaluation_result['overall_score'],
+                    'correctness_score': evaluation_result['correctness_score'],
+                    'security_score': evaluation_result['security_score'],
+                    'performance_score': evaluation_result['performance_score'],
+                    'humaneval_results': {
+                        'total_tests': evaluation_result['detailed_results']['humaneval']['total_tests'],
+                        'passed_tests': evaluation_result['detailed_results']['humaneval']['passed_tests'],
+                        'success_rate': (evaluation_result['detailed_results']['humaneval']['passed_tests'] / 
+                                       evaluation_result['detailed_results']['humaneval']['total_tests'] * 100) 
+                                       if evaluation_result['detailed_results']['humaneval']['total_tests'] > 0 else 0
+                    },
+                    'securityeval_results': {
+                        'security_score': evaluation_result['detailed_results']['securityeval']['security_score'],
+                        'vulnerabilities_found': len(evaluation_result['detailed_results']['securityeval']['vulnerabilities']),
+                        'passed_security_tests': evaluation_result['detailed_results']['securityeval']['passed_security_tests'],
+                        'total_security_tests': evaluation_result['detailed_results']['securityeval']['total_security_tests']
+                    },
+                    'vulnerabilities': evaluation_result['detailed_results']['securityeval']['vulnerabilities'],
+                    'performance_metrics': evaluation_result['detailed_results']['performance_metrics'],
+                    'evaluation_summary': evaluation_result['evaluation_summary'],
+                    'execution_time': evaluation_result['execution_time']
+                }
+            }
+            
+            # Add recommendations based on evaluation results
+            enhanced_result['recommendations'] = self._generate_improvement_recommendations(evaluation_result)
+            
+            self.logger.info(f"Code evaluation completed - Overall Score: {evaluation_result['overall_score']:.1f}%")
+            
+            return enhanced_result
+            
+        except Exception as e:
+            self.logger.error(f"Evaluation failed: {e}")
+            return {
+                **generate_result,
+                'evaluation_results': {
+                    'evaluation_enabled': True,
+                    'error': str(e),
+                    'message': 'Evaluation failed but code generation successful'
+                }
+            }
     
     async def _refactor_code(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Refactor existing code"""
@@ -556,6 +668,56 @@ import {framework}
             'csharp': 'cs'
         }
         return extensions.get(language.lower(), 'txt')
+    
+    def _generate_improvement_recommendations(self, evaluation_result: Dict[str, Any]) -> List[str]:
+        """Generate improvement recommendations based on evaluation results"""
+        recommendations = []
+        
+        correctness_score = evaluation_result['correctness_score']
+        security_score = evaluation_result['security_score']
+        performance_score = evaluation_result['performance_score']
+        
+        # Correctness recommendations
+        if correctness_score < 50:
+            recommendations.append("⚠️ Low correctness score - Review algorithm implementation and edge cases")
+        elif correctness_score < 80:
+            recommendations.append("📝 Moderate correctness score - Consider additional testing and validation")
+        
+        # Security recommendations
+        if security_score < 60:
+            recommendations.append("🔒 Critical security issues found - Address vulnerabilities immediately")
+        elif security_score < 80:
+            recommendations.append("🛡️ Security improvements needed - Review and fix identified vulnerabilities")
+        
+        # Performance recommendations
+        if performance_score < 50:
+            recommendations.append("⚡ Performance optimization needed - Review algorithm efficiency")
+        elif performance_score < 80:
+            recommendations.append("🚀 Consider performance improvements for better efficiency")
+        
+        # Vulnerability-specific recommendations
+        vulnerabilities = evaluation_result['detailed_results']['securityeval']['vulnerabilities']
+        vuln_types = set(v['type'] for v in vulnerabilities)
+        
+        for vuln_type in vuln_types:
+            if vuln_type == 'sql_injection':
+                recommendations.append("🔍 Use parameterized queries to prevent SQL injection")
+            elif vuln_type == 'xss':
+                recommendations.append("🛡️ Implement input sanitization and output encoding")
+            elif vuln_type == 'hardcoded_secrets':
+                recommendations.append("🔑 Move secrets to environment variables or secure storage")
+            elif vuln_type == 'path_traversal':
+                recommendations.append("📁 Validate and sanitize file paths to prevent traversal attacks")
+        
+        # General recommendations
+        if evaluation_result['overall_score'] > 90:
+            recommendations.append("✅ Excellent code quality - Consider this implementation")
+        elif evaluation_result['overall_score'] > 70:
+            recommendations.append("👍 Good code quality with room for improvement")
+        else:
+            recommendations.append("❌ Significant improvements needed before production use")
+        
+        return recommendations
     
     def _get_dependencies(self, language: str, framework: str) -> List[str]:
         """Get typical dependencies for language/framework"""

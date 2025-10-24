@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SEAgent - GitHub Integration</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             margin: 0;
@@ -245,6 +246,241 @@
                 font-size: 2em;
             }
         }
+
+        /* Evaluation Metrics Styles */
+        .evaluation-section {
+            grid-column: 1 / -1;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .evaluation-section.show {
+            display: block;
+        }
+
+        .evaluation-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .evaluation-header h3 {
+            color: #2c3e50;
+            font-size: 1.8em;
+            margin-bottom: 10px;
+        }
+
+        .evaluation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .metric-card h4 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .score-circle {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 15px;
+        }
+
+        .score-circle canvas {
+            transform: rotate(-90deg);
+        }
+
+        .score-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .score-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .score-label {
+            font-size: 0.8em;
+            color: #7f8c8d;
+        }
+
+        .test-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .test-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .test-card h4 {
+            color: #495057;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .test-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .test-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .test-details {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+
+        .vulnerabilities-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .vulnerability-item {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .vulnerability-item.critical {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+
+        .vulnerability-item.high {
+            background: #f8d7da;
+            border-left-color: #fd7e14;
+        }
+
+        .vulnerability-item.medium {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+
+        .vulnerability-item.low {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+
+        .recommendations {
+            background: #e8f5e8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .recommendations h4 {
+            color: #27ae60;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .recommendation-item {
+            background: white;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            border-left: 4px solid #27ae60;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            height: 400px;
+            position: relative;
+        }
+
+        .chart-container h4 {
+            text-align: center;
+            color: #495057;
+            margin-bottom: 20px;
+        }
+
+        .template-section {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .template-section h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .template-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .template-btn {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .template-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+        }
+
+        .template-btn.web { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); }
+        .template-btn.api { background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); }
+        .template-btn.data { background: linear-gradient(135deg, #17a2b8 0%, #117a8b 100%); }
+        .template-btn.automation { background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); color: #212529; }
+        .template-btn.game { background: linear-gradient(135deg, #e83e8c 0%, #c43570 100%); }
+        .template-btn.tool { background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); }
     </style>
 </head>
 <body>
@@ -271,6 +507,24 @@
                             <label for="requirements">Code Requirements</label>
                             <textarea id="requirements" placeholder="Describe what you want to build...
 Example: Create a Python FastAPI REST API with user authentication, CRUD operations for a todo list, and SQLite database integration. Include error handling and logging." required></textarea>
+                            
+                            <div class="template-section">
+                                <h4>📋 Quick Templates - Click to Auto-Fill</h4>
+                                <div class="template-buttons">
+                                    <button type="button" class="template-btn web" onclick="fillTemplate('todo-app')">📝 Todo App</button>
+                                    <button type="button" class="template-btn api" onclick="fillTemplate('rest-api')">🌐 REST API</button>
+                                    <button type="button" class="template-btn web" onclick="fillTemplate('blog-site')">📰 Blog Site</button>
+                                    <button type="button" class="template-btn data" onclick="fillTemplate('data-analyzer')">📊 Data Analyzer</button>
+                                    <button type="button" class="template-btn automation" onclick="fillTemplate('web-scraper')">🕷️ Web Scraper</button>
+                                    <button type="button" class="template-btn tool" onclick="fillTemplate('file-organizer')">📁 File Organizer</button>
+                                    <button type="button" class="template-btn game" onclick="fillTemplate('calculator')">🧮 Calculator</button>
+                                    <button type="button" class="template-btn api" onclick="fillTemplate('weather-app')">🌤️ Weather App</button>
+                                    <button type="button" class="template-btn data" onclick="fillTemplate('url-shortener')">🔗 URL Shortener</button>
+                                    <button type="button" class="template-btn tool" onclick="fillTemplate('password-gen')">🔐 Password Generator</button>
+                                    <button type="button" class="template-btn automation" onclick="fillTemplate('backup-script')">💾 Backup Script</button>
+                                    <button type="button" class="template-btn web" onclick="fillTemplate('portfolio')">🎨 Portfolio Site</button>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="form-group">
@@ -382,6 +636,124 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
                 <div id="uploadStatus" class="status-area"></div>
             </div>
         </div>
+
+        <!-- Evaluation Metrics Section -->
+        <div id="evaluationSection" class="evaluation-section">
+            <div class="evaluation-header">
+                <h3>🔬 Code Quality & Security Analysis</h3>
+                <p>Comprehensive evaluation with HumanEval and SecurityEval datasets</p>
+            </div>
+
+            <div class="evaluation-grid">
+                <div class="metric-card">
+                    <h4>📊 Overall Score</h4>
+                    <div class="score-circle">
+                        <canvas id="overallChart" width="100" height="100"></canvas>
+                        <div class="score-text">
+                            <div class="score-value" id="overallScore">0%</div>
+                            <div class="score-label">Quality</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <h4>🎯 Correctness</h4>
+                    <div class="score-circle">
+                        <canvas id="correctnessChart" width="100" height="100"></canvas>
+                        <div class="score-text">
+                            <div class="score-value" id="correctnessScore">0%</div>
+                            <div class="score-label">HumanEval</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <h4>🔒 Security</h4>
+                    <div class="score-circle">
+                        <canvas id="securityChart" width="100" height="100"></canvas>
+                        <div class="score-text">
+                            <div class="score-value" id="securityScore">0%</div>
+                            <div class="score-label">SecEval</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <h4>⚡ Performance</h4>
+                    <div class="score-circle">
+                        <canvas id="performanceChart" width="100" height="100"></canvas>
+                        <div class="score-text">
+                            <div class="score-value" id="performanceScore">0%</div>
+                            <div class="score-label">Speed</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="test-results">
+                <div class="test-card">
+                    <h4>🧪 HumanEval Tests</h4>
+                    <div class="test-stats">
+                        <div class="test-number" id="humaneval-results">0/0</div>
+                        <div class="test-details">
+                            Success Rate: <span id="humaneval-rate">0%</span>
+                        </div>
+                    </div>
+                    <div class="test-details">
+                        Measures functional correctness and algorithmic accuracy
+                    </div>
+                </div>
+
+                <div class="test-card">
+                    <h4>🛡️ SecurityEval Tests</h4>
+                    <div class="test-stats">
+                        <div class="test-number" id="securityeval-results">0/0</div>
+                        <div class="test-details">
+                            Vulnerabilities: <span id="vulnerabilities-count">0</span>
+                        </div>
+                    </div>
+                    <div class="test-details">
+                        Scans for security vulnerabilities and compliance issues
+                    </div>
+                </div>
+
+                <div class="test-card">
+                    <h4>⚡ Performance Metrics</h4>
+                    <div class="test-stats">
+                        <div class="test-number" id="execution-time">0ms</div>
+                        <div class="test-details">
+                            Avg Execution Time
+                        </div>
+                    </div>
+                    <div class="test-details">
+                        Efficiency: <span id="efficiency-rating">N/A</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="vulnerabilities-section" style="display: none;">
+                <div class="test-card">
+                    <h4>🚨 Security Vulnerabilities</h4>
+                    <div id="vulnerabilities-container" class="vulnerabilities-list">
+                        <!-- Vulnerabilities will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <div id="recommendations-section" class="recommendations">
+                <h4>💡 Recommendations</h4>
+                <div id="recommendations-container">
+                    <p>Generate code to see personalized recommendations</p>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h4>📈 Detailed Analysis</h4>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="detailedChart"></canvas>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -390,6 +762,73 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
         
         // API Configuration
         const API_BASE = window.location.origin;
+        
+        // Template filling function
+        function fillTemplate(templateType) {
+            const templates = {
+                'todo-app': {
+                    text: "create a code Todo app with add, edit, delete tasks and local storage",
+                    language: "python"
+                },
+                'rest-api': {
+                    text: "create a python code for RESTful API with authentication, CRUD operations, and database integration",
+                    language: "python"
+                },
+                'blog-site': {
+                    text: "Blog website with articles, comments, user authentication, and admin dashboard",
+                    language: "javascript"
+                },
+                'data-analyzer': {
+                    text: "Data analysis tool with CSV upload, visualization, and statistical calculations",
+                    language: "python"
+                },
+                'web-scraper': {
+                    text: "Web scraper with multi-site support, data extraction, and export",
+                    language: "python"
+                },
+                'file-organizer': {
+                    text: "File organizer with automatic sorting, duplicate detection, and bulk renaming",
+                    language: "python"
+                },
+                'calculator': {
+                    text: "Scientific calculator with basic operations, memory functions, and unit conversions",
+                    language: "javascript"
+                },
+                'weather-app': {
+                    text: "Weather app with current conditions, forecasts, and location detection",
+                    language: "javascript"
+                },
+                'url-shortener': {
+                    text: "URL shortener with custom aliases, click tracking, and analytics",
+                    language: "python"
+                },
+                'password-gen': {
+                    text: "Password generator with customizable length, complexity, and strength indicator",
+                    language: "python"
+                },
+                'backup-script': {
+                    text: "Backup system with multiple destinations, scheduling, and integrity checks",
+                    language: "python"
+                },
+                'portfolio': {
+                    text: "Portfolio website with project showcase, responsive design, and contact form",
+                    language: "javascript"
+                }
+            };
+            
+            const template = templates[templateType];
+            if (template) {
+                document.getElementById('requirements').value = template.text;
+                document.getElementById('language').value = template.language;
+                
+                // Visual feedback
+                const textarea = document.getElementById('requirements');
+                textarea.style.background = '#e8f5e8';
+                setTimeout(() => {
+                    textarea.style.background = '';
+                }, 1000);
+            }
+        }
         
         // Tab switching
         function switchTab(tabName) {
@@ -413,6 +852,7 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
             document.getElementById('codeOutput').style.display = 'none';
             hideStatus('generateStatus');
             hideStatus('uploadStatus');
+            hideEvaluationSection();
         }
         
         // Show/hide PR options
@@ -429,11 +869,12 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
             const language = document.getElementById('language').value;
             const framework = document.getElementById('framework').value;
             
-            showStatus('generateStatus', 'info', '🔄 Generating code with AI...');
+            showStatus('generateStatus', 'info', '🔄 Generating code with AI and running evaluation...');
             setButtonLoading('generateBtn', true);
             
             try {
-                const response = await fetch(`${API_BASE}/api/v1/generate/direct`, {
+                // Use the new generate-with-evaluation endpoint
+                const response = await fetch(`${API_BASE}/api/generate-with-evaluation`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -442,21 +883,22 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
                         requirements: requirements,
                         language: language,
                         framework: framework,
-                        context: {}
+                        run_evaluation: true
                     })
                 });
                 
                 const result = await response.json();
                 
                 if (response.ok && result.success) {
-                    // Handle direct response - no polling needed
-                    handleDirectCodeGeneration(result, language);
+                    // Handle code generation with evaluation
+                    handleCodeGenerationWithEvaluation(result, language);
                 } else {
                     throw new Error(result.error || result.detail || 'Generation failed');
                 }
             } catch (error) {
                 showStatus('generateStatus', 'error', `❌ Generation failed: ${error.message}`);
                 setButtonLoading('generateBtn', false);
+                hideEvaluationSection();
             }
         });
         
@@ -616,6 +1058,227 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
             showStatus('generateStatus', 'success', `✅ Code generated successfully! ${Object.keys(generatedFiles).length} files ready.`);
             setButtonLoading('generateBtn', false);
         }
+
+        // Handle code generation with evaluation
+        function handleCodeGenerationWithEvaluation(result, language) {
+            // First handle the code generation part
+            handleDirectCodeGeneration(result, language);
+            
+            // Then handle evaluation results if available
+            const evalResults = result.evaluation_results;
+            if (evalResults && evalResults.evaluation_enabled) {
+                displayEvaluationResults(evalResults);
+                showEvaluationSection();
+                
+                // Update status with evaluation info
+                const overallScore = evalResults.overall_score || 0;
+                showStatus('generateStatus', 'success', 
+                    `✅ Code generated and evaluated! Overall Score: ${Math.round(overallScore)}% | Files ready: ${Object.keys(generatedFiles).length}`);
+            } else {
+                showStatus('generateStatus', 'success', 
+                    `✅ Code generated! Evaluation not available. Files ready: ${Object.keys(generatedFiles).length}`);
+            }
+            
+            setButtonLoading('generateBtn', false);
+        }
+
+        // Display evaluation results
+        function displayEvaluationResults(evalResults) {
+            // Update score displays
+            document.getElementById('overallScore').textContent = `${Math.round(evalResults.overall_score || 0)}%`;
+            document.getElementById('correctnessScore').textContent = `${Math.round(evalResults.correctness_score || 0)}%`;
+            document.getElementById('securityScore').textContent = `${Math.round(evalResults.security_score || 0)}%`;
+            document.getElementById('performanceScore').textContent = `${Math.round(evalResults.performance_score || 0)}%`;
+
+            // Update HumanEval results
+            const humaneval = evalResults.humaneval_results || {};
+            document.getElementById('humaneval-results').textContent = `${humaneval.passed_tests || 0}/${humaneval.total_tests || 0}`;
+            document.getElementById('humaneval-rate').textContent = `${Math.round(humaneval.success_rate || 0)}%`;
+
+            // Update SecurityEval results
+            const securityeval = evalResults.securityeval_results || {};
+            document.getElementById('securityeval-results').textContent = `${securityeval.passed_security_tests || 0}/${securityeval.total_security_tests || 0}`;
+            document.getElementById('vulnerabilities-count').textContent = securityeval.vulnerabilities_found || 0;
+
+            // Update performance metrics
+            const perfMetrics = evalResults.performance_metrics || {};
+            if (perfMetrics.avg_execution_time) {
+                const execTime = Math.round((perfMetrics.avg_execution_time || 0) * 1000);
+                document.getElementById('execution-time').textContent = `${execTime}ms`;
+                
+                // Set efficiency rating
+                let rating = 'Poor';
+                if (execTime < 100) rating = 'Excellent';
+                else if (execTime < 500) rating = 'Good';
+                else if (execTime < 1000) rating = 'Fair';
+                
+                document.getElementById('efficiency-rating').textContent = rating;
+            }
+
+            // Display vulnerabilities
+            displayVulnerabilities(evalResults.vulnerabilities || []);
+
+            // Display recommendations
+            displayRecommendations(evalResults.recommendations || []);
+
+            // Draw charts
+            drawScoreChart('overallChart', evalResults.overall_score || 0);
+            drawScoreChart('correctnessChart', evalResults.correctness_score || 0);
+            drawScoreChart('securityChart', evalResults.security_score || 0);
+            drawScoreChart('performanceChart', evalResults.performance_score || 0);
+            
+            // Draw detailed radar chart
+            drawDetailedChart(evalResults);
+        }
+
+        // Display vulnerabilities
+        function displayVulnerabilities(vulnerabilities) {
+            const container = document.getElementById('vulnerabilities-container');
+            const section = document.getElementById('vulnerabilities-section');
+            
+            if (!vulnerabilities || vulnerabilities.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            let html = '';
+            
+            vulnerabilities.forEach(vuln => {
+                const severity = vuln.severity || 'medium';
+                html += `
+                    <div class="vulnerability-item ${severity}">
+                        <strong>${vuln.type || 'Security Issue'}</strong> (${severity.toUpperCase()})
+                        <div style="margin-top: 5px; font-size: 0.9em;">
+                            ${vuln.description || 'Security vulnerability detected'}
+                        </div>
+                        ${vuln.line ? `<div style="margin-top: 5px; font-size: 0.8em; color: #666;">Line: ${vuln.line}</div>` : ''}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Display recommendations
+        function displayRecommendations(recommendations) {
+            const container = document.getElementById('recommendations-container');
+            
+            if (!recommendations || recommendations.length === 0) {
+                container.innerHTML = '<p>No specific recommendations available.</p>';
+                return;
+            }
+
+            let html = '';
+            recommendations.forEach(rec => {
+                html += `<div class="recommendation-item">${rec}</div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Draw score circle chart
+        function drawScoreChart(canvasId, score) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 35;
+            const startAngle = 0;
+            const endAngle = (score / 100) * 2 * Math.PI;
+            
+            // Background circle
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = '#ecf0f1';
+            ctx.stroke();
+            
+            // Score circle
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            
+            // Color based on score
+            if (score >= 90) ctx.strokeStyle = '#27ae60';
+            else if (score >= 70) ctx.strokeStyle = '#f39c12';
+            else if (score >= 50) ctx.strokeStyle = '#e67e22';
+            else ctx.strokeStyle = '#e74c3c';
+            
+            ctx.stroke();
+        }
+
+        // Draw detailed radar chart
+        let detailedChartInstance = null;
+        
+        function drawDetailedChart(evalResults) {
+            const canvas = document.getElementById('detailedChart');
+            const ctx = canvas.getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (detailedChartInstance) {
+                detailedChartInstance.destroy();
+            }
+            
+            detailedChartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Correctness', 'Security', 'Performance', 'Code Quality'],
+                    datasets: [{
+                        label: 'Scores',
+                        data: [
+                            evalResults.correctness_score || 0,
+                            evalResults.security_score || 0,
+                            evalResults.performance_score || 0,
+                            evalResults.overall_score || 0
+                        ],
+                        backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgba(52, 152, 219, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(52, 152, 219, 1)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 1,
+                    scales: {
+                        r: {
+                            angleLines: {
+                                display: true
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 100,
+                            ticks: {
+                                stepSize: 20
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // Show/hide evaluation section
+        function showEvaluationSection() {
+            document.getElementById('evaluationSection').classList.add('show');
+        }
+
+        function hideEvaluationSection() {
+            document.getElementById('evaluationSection').classList.remove('show');
+        }
         
         // Poll task status
         async function pollTaskStatus(taskId, type) {
@@ -770,7 +1433,7 @@ Example: Create a Python FastAPI REST API with user authentication, CRUD operati
         document.addEventListener('DOMContentLoaded', function() {
             // Set default values
             document.getElementById('owner').value = 'navicharan';
-            document.getElementById('repository').value = 'seagent-generated';
+            document.getElementById('repository').value = 'inbox_bouncer';
         });
     </script>
 </body>
