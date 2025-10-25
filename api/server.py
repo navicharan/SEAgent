@@ -79,6 +79,35 @@ class TestingRequest(BaseModel):
     test_framework: str = "pytest"
 
 
+class CICDPipelineRequest(BaseModel):
+    project_info: Dict[str, Any]
+    platform: str = "github_actions"
+    requirements: List[str] = []
+
+
+class CICDAnalysisRequest(BaseModel):
+    pipeline_config: str
+    platform: str = "github_actions"
+    historical_data: Optional[Dict[str, Any]] = None
+
+
+class CICDOptimizationRequest(BaseModel):
+    pipeline_config: str
+    platform: str = "github_actions"
+    optimization_goals: List[str] = ["performance", "cost"]
+
+
+class CICDDeploymentRequest(BaseModel):
+    deployment_config: Dict[str, Any]
+    environment: str = "staging"
+    version: str = "latest"
+
+
+class CICDMonitoringRequest(BaseModel):
+    pipeline_id: str
+    platform: str = "github_actions"
+
+
 class GitHubUploadRequest(BaseModel):
     repository_name: str
     owner: str
@@ -1014,6 +1043,279 @@ class APIServer:
         
         # GitHub Integration Endpoints
         @self.app.post("/api/v1/github/upload")
+        async def upload_to_github(request: GitHubUploadRequest):
+            """Upload generated code to GitHub repository"""
+            try:
+                # Get the integration agent
+                integration_agent = self.coordinator.agents.get('integration')
+                if not integration_agent:
+                    raise HTTPException(status_code=503, detail="Integration agent not available")
+                
+                # Execute GitHub upload task
+                task = Task(
+                    id=f"github_upload_{len(self.coordinator.tasks) + 1}",
+                    type=TaskType.INTEGRATION,
+                    priority=2,
+                    project_id="github_upload",
+                    parameters={
+                        "task_type": "github_upload",
+                        "repository_name": request.repository_name,
+                        "owner": request.owner,
+                        "files": request.files,
+                        "commit_message": request.commit_message,
+                        "branch": request.branch,
+                        "create_pr": request.create_pr,
+                        "pr_title": request.pr_title,
+                        "pr_description": request.pr_description
+                    }
+                )
+                
+                task_id = await self.coordinator.submit_task(task)
+                
+                return {
+                    "task_id": task_id,
+                    "status": "uploading",
+                    "message": f"Uploading files to {request.owner}/{request.repository_name}",
+                    "repository": f"{request.owner}/{request.repository_name}",
+                    "branch": request.branch,
+                    "files_count": len(request.files)
+                }
+                
+            except Exception as e:
+                self.logger.error(f"GitHub upload failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        
+        # CI/CD Pipeline Endpoints
+        @self.app.post("/api/v1/cicd/create-pipeline")
+        async def create_cicd_pipeline(request: CICDPipelineRequest):
+            """Create intelligent CI/CD pipeline"""
+            try:
+                cicd_agent = self.coordinator.agents.get('cicd')
+                if not cicd_agent:
+                    raise HTTPException(status_code=503, detail="CI/CD agent not available")
+                
+                result = await cicd_agent.execute_task({
+                    "task_type": "create_pipeline",
+                    "project_info": request.project_info,
+                    "platform": request.platform,
+                    "requirements": request.requirements
+                })
+                
+                return {
+                    "success": True,
+                    "pipeline_created": True,
+                    "platform": request.platform,
+                    "result": result
+                }
+                
+            except Exception as e:
+                self.logger.error(f"CI/CD pipeline creation failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Pipeline creation failed: {str(e)}")
+        
+        @self.app.post("/api/v1/cicd/analyze-pipeline")
+        async def analyze_cicd_pipeline(request: CICDAnalysisRequest):
+            """Analyze existing CI/CD pipeline"""
+            try:
+                cicd_agent = self.coordinator.agents.get('cicd')
+                if not cicd_agent:
+                    raise HTTPException(status_code=503, detail="CI/CD agent not available")
+                
+                result = await cicd_agent.execute_task({
+                    "task_type": "analyze_pipeline",
+                    "pipeline_config": request.pipeline_config,
+                    "platform": request.platform,
+                    "historical_data": request.historical_data
+                })
+                
+                return {
+                    "success": True,
+                    "analysis_completed": True,
+                    "platform": request.platform,
+                    "result": result
+                }
+                
+            except Exception as e:
+                self.logger.error(f"CI/CD pipeline analysis failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Pipeline analysis failed: {str(e)}")
+        
+        @self.app.post("/api/v1/cicd/optimize-pipeline")
+        async def optimize_cicd_pipeline(request: CICDOptimizationRequest):
+            """Optimize CI/CD pipeline for performance and cost"""
+            try:
+                cicd_agent = self.coordinator.agents.get('cicd')
+                if not cicd_agent:
+                    raise HTTPException(status_code=503, detail="CI/CD agent not available")
+                
+                result = await cicd_agent.execute_task({
+                    "task_type": "optimize_pipeline",
+                    "pipeline_config": request.pipeline_config,
+                    "platform": request.platform,
+                    "optimization_goals": request.optimization_goals
+                })
+                
+                return {
+                    "success": True,
+                    "optimization_completed": True,
+                    "platform": request.platform,
+                    "result": result
+                }
+                
+            except Exception as e:
+                self.logger.error(f"CI/CD pipeline optimization failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Pipeline optimization failed: {str(e)}")
+        
+        @self.app.post("/api/v1/cicd/deploy")
+        async def deploy_application(request: CICDDeploymentRequest):
+            """Deploy application to specified environment"""
+            try:
+                cicd_agent = self.coordinator.agents.get('cicd')
+                if not cicd_agent:
+                    raise HTTPException(status_code=503, detail="CI/CD agent not available")
+                
+                result = await cicd_agent.execute_task({
+                    "task_type": "deploy_application",
+                    "deployment_config": request.deployment_config,
+                    "environment": request.environment,
+                    "version": request.version
+                })
+                
+                return {
+                    "success": True,
+                    "deployment_initiated": True,
+                    "environment": request.environment,
+                    "version": request.version,
+                    "result": result
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Application deployment failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Deployment failed: {str(e)}")
+        
+        @self.app.post("/api/v1/cicd/monitor")
+        async def monitor_cicd_pipeline(request: CICDMonitoringRequest):
+            """Monitor CI/CD pipeline health"""
+            try:
+                cicd_agent = self.coordinator.agents.get('cicd')
+                if not cicd_agent:
+                    raise HTTPException(status_code=503, detail="CI/CD agent not available")
+                
+                result = await cicd_agent.execute_task({
+                    "task_type": "monitor_pipeline",
+                    "pipeline_id": request.pipeline_id,
+                    "platform": request.platform
+                })
+                
+                return {
+                    "success": True,
+                    "monitoring_active": True,
+                    "pipeline_id": request.pipeline_id,
+                    "platform": request.platform,
+                    "result": result
+                }
+                
+            except Exception as e:
+                self.logger.error(f"CI/CD pipeline monitoring failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Pipeline monitoring failed: {str(e)}")
+        
+        @self.app.post("/api/v1/cicd/setup-github-actions")
+        async def setup_github_actions(request: Dict[str, Any]):
+            """Setup GitHub Actions workflows for repository"""
+            try:
+                cicd_agent = self.coordinator.agents.get('cicd')
+                if not cicd_agent:
+                    raise HTTPException(status_code=503, detail="CI/CD agent not available")
+                
+                result = await cicd_agent.execute_task({
+                    "task_type": "setup_github_actions",
+                    "repository_name": request.get("repository_name", ""),
+                    "owner": request.get("owner", ""),
+                    "project_type": request.get("project_type", "python")
+                })
+                
+                return {
+                    "success": True,
+                    "github_actions_setup": True,
+                    "repository": f"{request.get('owner')}/{request.get('repository_name')}",
+                    "result": result
+                }
+                
+            except Exception as e:
+                self.logger.error(f"GitHub Actions setup failed: {e}")
+                raise HTTPException(status_code=500, detail=f"GitHub Actions setup failed: {str(e)}")
+        
+        @self.app.post("/api/v1/cicd/trigger-deployment")
+        async def trigger_deployment(request: Dict[str, Any]):
+            """Trigger deployment pipeline"""
+            try:
+                cicd_agent = self.coordinator.agents.get('cicd')
+                if not cicd_agent:
+                    raise HTTPException(status_code=503, detail="CI/CD agent not available")
+                
+                result = await cicd_agent.execute_task({
+                    "task_type": "trigger_deployment",
+                    "repository_name": request.get("repository_name", ""),
+                    "owner": request.get("owner", ""),
+                    "environment": request.get("environment", "staging"),
+                    "workflow_name": request.get("workflow_name", "cd.yml")
+                })
+                
+                return {
+                    "success": True,
+                    "deployment_triggered": True,
+                    "environment": request.get("environment", "staging"),
+                    "result": result
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Deployment trigger failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Deployment trigger failed: {str(e)}")
+        
+        @self.app.get("/api/v1/cicd/pipelines")
+        async def list_cicd_pipelines():
+            """List available CI/CD pipelines and their status"""
+            try:
+                # This would integrate with actual CI/CD platforms
+                return {
+                    "pipelines": [
+                        {
+                            "id": "seagent-ci",
+                            "name": "SEAgent CI/CD",
+                            "platform": "github_actions",
+                            "status": "active",
+                            "last_run": "2025-10-25T10:30:00Z",
+                            "success_rate": 0.95
+                        }
+                    ],
+                    "total_count": 1
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Pipeline listing failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Pipeline listing failed: {str(e)}")
+        
+        @self.app.get("/api/v1/cicd/deployments")
+        async def list_deployments():
+            """List recent deployments"""
+            try:
+                return {
+                    "deployments": [
+                        {
+                            "id": "deploy-001",
+                            "environment": "staging",
+                            "version": "v1.0.0",
+                            "status": "success",
+                            "deployed_at": "2025-10-25T10:00:00Z",
+                            "url": "https://seagent-staging.example.com"
+                        }
+                    ],
+                    "total_count": 1
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Deployment listing failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Deployment listing failed: {str(e)}")
+
+        @self.app.post("/api/v1/github/upload/direct")
         async def upload_to_github(request: GitHubUploadRequest):
             """Upload generated code to GitHub repository"""
             try:

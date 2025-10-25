@@ -138,6 +138,20 @@ agents:
       security_testing: true
       performance_testing: true
 
+  cicd:
+    enabled: true
+    max_concurrent_tasks: 2
+    timeout: 1800
+    retry_attempts: 1
+    log_level: INFO
+    specific_config:
+      supported_platforms: ["github_actions", "gitlab_ci", "jenkins"]
+      auto_deploy_staging: true
+      auto_deploy_production: false
+      deployment_approval_required: true
+      monitoring_enabled: true
+      rollback_enabled: true
+
 # Integration Configurations
 integrations:
   git:

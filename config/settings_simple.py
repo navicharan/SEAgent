@@ -50,6 +50,20 @@ class APIConfig:
 
 
 @dataclass
+class OpenAIConfig:
+    """OpenAI API configuration - secured with environment variables"""
+    api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
+    model: str = field(default_factory=lambda: os.getenv("OPENAI_MODEL", "gpt-4"))
+    base_url: str = field(default_factory=lambda: os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"))
+    max_tokens: int = field(default_factory=lambda: int(os.getenv("OPENAI_MAX_TOKENS", "4000")))
+    temperature: float = field(default_factory=lambda: float(os.getenv("OPENAI_TEMPERATURE", "0.7")))
+    
+    def is_configured(self) -> bool:
+        """Check if OpenAI is properly configured"""
+        return bool(self.api_key and len(self.api_key) > 10)
+
+
+@dataclass
 class DeepSeekConfig:
     """DeepSeek-Coder V2 API configuration - secured with environment variables"""
     api_key: str = field(default_factory=lambda: os.getenv("DEEPSEEK_API_KEY", ""))
@@ -115,6 +129,7 @@ class AgentsConfig:
     performance: AgentConfig = field(default_factory=AgentConfig)
     integration: AgentConfig = field(default_factory=AgentConfig)
     testing: AgentConfig = field(default_factory=AgentConfig)
+    cicd: AgentConfig = field(default_factory=AgentConfig)
 
 
 class Settings:
@@ -125,6 +140,7 @@ class Settings:
         
         # Set default values
         self.api = APIConfig()
+        self.openai = OpenAIConfig()
         self.deepseek = DeepSeekConfig()
         self.ui = UIConfig()
         self.database = DatabaseConfig()
@@ -132,6 +148,10 @@ class Settings:
         self.logging = LoggingConfig()
         self.security = SecurityConfig()
         self.agents = AgentsConfig()
+        
+        # Task monitoring configuration
+        self.task_timeout = 300  # seconds
+        self.monitor_interval = 10  # seconds
         
         # Load configuration if file exists
         self._load_config()

@@ -14,6 +14,7 @@ from agents.debug_agent import DebugAgent
 from agents.performance_agent import PerformanceAgent
 from agents.integration_agent import IntegrationAgent
 from agents.testing_agent import TestingAgent
+from agents.cicd_agent import CICDAgent
 
 
 class TaskType(Enum):
@@ -23,6 +24,7 @@ class TaskType(Enum):
     PERFORMANCE_OPTIMIZATION = "performance_optimization"
     INTEGRATION = "integration"
     TESTING = "testing"
+    CICD = "cicd"
 
 
 class TaskStatus(Enum):
@@ -71,7 +73,8 @@ class AgentCoordinator:
             'debug': DebugAgent(settings.agents.debug),
             'performance': PerformanceAgent(settings.agents.performance),
             'integration': IntegrationAgent(settings.agents.integration),
-            'testing': TestingAgent(settings.agents.testing)
+            'testing': TestingAgent(settings.agents.testing),
+            'cicd': CICDAgent(settings.agents.cicd)
         }
         
         # Task management
@@ -244,7 +247,8 @@ class AgentCoordinator:
             TaskType.DEBUGGING: 'debug',
             TaskType.PERFORMANCE_OPTIMIZATION: 'performance',
             TaskType.INTEGRATION: 'integration',
-            TaskType.TESTING: 'testing'
+            TaskType.TESTING: 'testing',
+            TaskType.CICD: 'cicd'
         }
         return mapping.get(task_type)
     
@@ -286,7 +290,8 @@ class AgentCoordinator:
                     {'name': 'debug_analysis', 'type': 'debugging', 'priority': 3, 'dependencies': ['generate_code']},
                     {'name': 'performance_analysis', 'type': 'performance_optimization', 'priority': 4, 'dependencies': ['generate_code']},
                     {'name': 'run_tests', 'type': 'testing', 'priority': 5, 'dependencies': ['generate_code', 'security_scan', 'debug_analysis']},
-                    {'name': 'integration', 'type': 'integration', 'priority': 6, 'dependencies': ['run_tests']}
+                    {'name': 'setup_cicd', 'type': 'cicd', 'priority': 6, 'dependencies': ['run_tests'], 'parameters': {'task_type': 'create_pipeline'}},
+                    {'name': 'integration', 'type': 'integration', 'priority': 7, 'dependencies': ['setup_cicd']}
                 ]
             },
             'security_focused': {
@@ -301,6 +306,20 @@ class AgentCoordinator:
                     {'name': 'performance_analysis', 'type': 'performance_optimization', 'priority': 1},
                     {'name': 'performance_testing', 'type': 'testing', 'priority': 2, 'dependencies': ['performance_analysis'], 'parameters': {'test_type': 'performance'}},
                     {'name': 'optimize_code', 'type': 'code_generation', 'priority': 3, 'dependencies': ['performance_analysis'], 'parameters': {'focus': 'performance'}}
+                ]
+            },
+            'cicd_deployment': {
+                'steps': [
+                    {'name': 'analyze_pipeline', 'type': 'cicd', 'priority': 1, 'parameters': {'task_type': 'analyze_pipeline'}},
+                    {'name': 'optimize_pipeline', 'type': 'cicd', 'priority': 2, 'dependencies': ['analyze_pipeline'], 'parameters': {'task_type': 'optimize_pipeline'}},
+                    {'name': 'deploy_staging', 'type': 'cicd', 'priority': 3, 'dependencies': ['optimize_pipeline'], 'parameters': {'task_type': 'deploy_application', 'environment': 'staging'}},
+                    {'name': 'deploy_production', 'type': 'cicd', 'priority': 4, 'dependencies': ['deploy_staging'], 'parameters': {'task_type': 'deploy_application', 'environment': 'production'}}
+                ]
+            },
+            'github_actions_setup': {
+                'steps': [
+                    {'name': 'create_workflows', 'type': 'cicd', 'priority': 1, 'parameters': {'task_type': 'setup_github_actions'}},
+                    {'name': 'upload_to_github', 'type': 'integration', 'priority': 2, 'dependencies': ['create_workflows'], 'parameters': {'task_type': 'github_upload'}}
                 ]
             }
         }
