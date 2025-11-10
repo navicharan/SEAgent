@@ -15,6 +15,7 @@ from agents.performance_agent import PerformanceAgent
 from agents.integration_agent import IntegrationAgent
 from agents.testing_agent import TestingAgent
 from agents.cicd_agent import CICDAgent
+from agents.application_generator_agent import ApplicationGeneratorAgent
 
 
 class TaskType(Enum):
@@ -74,7 +75,8 @@ class AgentCoordinator:
             'performance': PerformanceAgent(settings.agents.performance),
             'integration': IntegrationAgent(settings.agents.integration),
             'testing': TestingAgent(settings.agents.testing),
-            'cicd': CICDAgent(settings.agents.cicd)
+            'cicd': CICDAgent(settings.agents.cicd),
+            'application_generator': ApplicationGeneratorAgent(settings.agents.code_generation)
         }
         
         # Task management

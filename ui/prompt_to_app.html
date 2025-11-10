@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt-to-App Generator | SEAgent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+            padding: 40px 0;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .header .description {
+            font-size: 1.1em;
+            opacity: 0.8;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .card-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-icon {
+            font-size: 1.5em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .running-apps {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-top: 30px;
+        }
+
+        .app-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+        }
+
+        .app-info {
+            flex: 1;
+        }
+
+        .app-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .app-details {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .app-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 14px;
+            min-width: auto;
+        }
+
+        .examples {
+            margin-top: 20px;
+        }
+
+        .example-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            border: 1px solid #e0e0e0;
+        }
+
+        .example-item:hover {
+            background: #e9ecef;
+        }
+
+        .example-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .example-description {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .status-running {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-stopped {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .app-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Prompt-to-App Generator</h1>
+            <p class="subtitle">From Natural Language to Working Applications</p>
+            <p class="description">
+                Transform your ideas into fully functional applications instantly. Just describe what you want,
+                and our AI will generate, deploy, and launch the complete application for you.
+            </p>
+        </div>
+
+        <div class="main-container">
+            <!-- Generation Panel -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="card-icon">✨</span>
+                    Generate Application
+                </div>
+
+                <form id="generateForm">
+                    <div class="form-group">
+                        <label for="promptInput">What application do you want to create?</label>
+                        <textarea 
+                            id="promptInput" 
+                            class="form-control" 
+                            placeholder="Example: Create a basic calculator with buttons for numbers and operations..."
+                            required
+                        ></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="appTypeSelect">Application Type</label>
+                        <select id="appTypeSelect" class="form-control">
+                            <option value="auto">🤖 Auto-detect</option>
+                            <option value="calculator">🧮 Calculator</option>
+                            <option value="text_editor">📝 Text Editor</option>
+                            <option value="game">🎮 Game</option>
+                            <option value="utility">🛠️ Utility Tool</option>
+                            <option value="data_viewer">📊 Data Viewer</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn" id="generateBtn">
+                        <span id="generateBtnText">✨ Generate Application</span>
+                        <div class="loading" id="generateLoading">
+                            <div class="spinner"></div>
+                            Generating...
+                        </div>
+                    </button>
+                </form>
+
+                <div class="result" id="generateResult"></div>
+
+                <!-- Example Prompts -->
+                <div class="examples">
+                    <h4>💡 Example Prompts:</h4>
+                    <div class="example-item" onclick="setPrompt('basic calculator')">
+                        <div class="example-title">Basic Calculator</div>
+                        <div class="example-description">Simple calculator with arithmetic operations</div>
+                    </div>
+                    <div class="example-item" onclick="setPrompt('todo list manager')">
+                        <div class="example-title">Todo List Manager</div>
+                        <div class="example-description">Task management application</div>
+                    </div>
+                    <div class="example-item" onclick="setPrompt('text notepad editor')">
+                        <div class="example-title">Text Notepad</div>
+                        <div class="example-description">Simple text editing application</div>
+                    </div>
+                    <div class="example-item" onclick="setPrompt('digital clock with timer')">
+                        <div class="example-title">Digital Clock</div>
+                        <div class="example-description">Clock application with timer functionality</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Launch Panel -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="card-icon">🚀</span>
+                    Launch Application
+                </div>
+
+                <div id="launchPanel" style="display: none;">
+                    <div class="form-group">
+                        <label>Generated Application</label>
+                        <div id="generatedAppInfo" class="form-control" style="background: #f8f9fa; min-height: auto;">
+                            No application generated yet
+                        </div>
+                    </div>
+
+                    <button class="btn btn-secondary" id="launchBtn" disabled>
+                        <span id="launchBtnText">🚀 Launch Application</span>
+                        <div class="loading" id="launchLoading">
+                            <div class="spinner"></div>
+                            Launching...
+                        </div>
+                    </button>
+
+                    <div class="result" id="launchResult"></div>
+                </div>
+
+                <div id="noAppMessage">
+                    <p style="color: #666; text-align: center; padding: 40px 20px;">
+                        Generate an application first to enable launching
+                    </p>
+                </div>
+
+                <!-- Quick Actions -->
+                <div style="margin-top: 30px;">
+                    <button class="btn btn-warning btn-small" onclick="generateAndLaunch()" id="quickGenerate" style="width: 100%;">
+                        ⚡ Quick Generate & Launch Calculator
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Running Applications -->
+        <div class="running-apps">
+            <div class="card-title">
+                <span class="card-icon">⚡</span>
+                Running Applications
+                <button class="btn btn-small" onclick="refreshRunningApps()" style="margin-left: auto; width: auto;">
+                    🔄 Refresh
+                </button>
+            </div>
+            
+            <div id="runningAppsList">
+                <p style="color: #666; text-align: center; padding: 20px;">
+                    No applications currently running
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentApp = null;
+
+        // Form submission handler
+        document.getElementById('generateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await generateApplication();
+        });
+
+        // Generate application
+        async function generateApplication() {
+            const prompt = document.getElementById('promptInput').value;
+            const appType = document.getElementById('appTypeSelect').value;
+            
+            if (!prompt.trim()) {
+                showResult('generateResult', 'Please enter a description of the application you want to create.', 'error');
+                return;
+            }
+
+            setLoading('generate', true);
+            
+            try {
+                const response = await fetch('/api/v1/apps/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        app_type: appType
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentApp = result;
+                    showResult('generateResult', 
+                        `✅ Application generated successfully!\n` +
+                        `Type: ${result.app_type}\n` +
+                        `Files: ${result.generated_files.length} files created\n` +
+                        `Ready to launch: ${result.launch_ready ? 'Yes' : 'No'}`, 
+                        'success'
+                    );
+                    
+                    // Enable launch panel
+                    document.getElementById('launchPanel').style.display = 'block';
+                    document.getElementById('noAppMessage').style.display = 'none';
+                    document.getElementById('launchBtn').disabled = !result.launch_ready;
+                    
+                    // Update app info
+                    document.getElementById('generatedAppInfo').innerHTML = 
+                        `<strong>${result.app_type.replace('_', ' ')}</strong><br>` +
+                        `Prompt: ${result.prompt}<br>` +
+                        `Files: ${result.generated_files.join(', ')}<br>` +
+                        `Generated: ${new Date(result.generated_at).toLocaleString()}`;
+                } else {
+                    showResult('generateResult', `❌ Generation failed: ${result.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showResult('generateResult', `❌ Error: ${error.message}`, 'error');
+            } finally {
+                setLoading('generate', false);
+            }
+        }
+
+        // Launch application
+        document.getElementById('launchBtn').addEventListener('click', async () => {
+            if (!currentApp) {
+                showResult('launchResult', 'No application to launch', 'error');
+                return;
+            }
+
+            setLoading('launch', true);
+
+            try {
+                const response = await fetch('/api/v1/apps/launch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        app_id: currentApp.app_id,
+                        executable_path: currentApp.executable_path,
+                        app_type: currentApp.app_type
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showResult('launchResult', 
+                        `🚀 Application launched successfully!\n` +
+                        `Process ID: ${result.process_id}\n` +
+                        `Status: ${result.status}`, 
+                        'success'
+                    );
+                    
+                    // Refresh running apps list
+                    setTimeout(refreshRunningApps, 1000);
+                } else {
+                    showResult('launchResult', `❌ Launch failed: ${result.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showResult('launchResult', `❌ Error: ${error.message}`, 'error');
+            } finally {
+                setLoading('launch', false);
+            }
+        });
+
+        // Quick generate and launch
+        async function generateAndLaunch() {
+            document.getElementById('promptInput').value = 'basic calculator';
+            document.getElementById('appTypeSelect').value = 'calculator';
+            
+            setLoading('generate', true);
+            
+            try {
+                const response = await fetch('/api/v1/apps/generate-and-launch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: 'basic calculator',
+                        app_type: 'calculator'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentApp = result.generation;
+                    showResult('generateResult', 
+                        `✅ Calculator generated and launched!\n` +
+                        `Process ID: ${result.launch.process_id}\n` +
+                        `Status: ${result.launch.status}`, 
+                        'success'
+                    );
+                    
+                    // Update UI
+                    document.getElementById('launchPanel').style.display = 'block';
+                    document.getElementById('noAppMessage').style.display = 'none';
+                    document.getElementById('launchBtn').disabled = false;
+                    
+                    document.getElementById('generatedAppInfo').innerHTML = 
+                        `<strong>Calculator</strong><br>` +
+                        `Prompt: basic calculator<br>` +
+                        `Status: Running (PID: ${result.launch.process_id})<br>` +
+                        `Generated: ${new Date().toLocaleString()}`;
+                    
+                    // Refresh running apps
+                    setTimeout(refreshRunningApps, 1000);
+                } else {
+                    showResult('generateResult', `❌ Quick launch failed: ${result.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showResult('generateResult', `❌ Error: ${error.message}`, 'error');
+            } finally {
+                setLoading('generate', false);
+            }
+        }
+
+        // Set example prompt
+        function setPrompt(prompt) {
+            document.getElementById('promptInput').value = prompt;
+        }
+
+        // Refresh running applications
+        async function refreshRunningApps() {
+            try {
+                const response = await fetch('/api/v1/apps/running');
+                const result = await response.json();
+
+                const container = document.getElementById('runningAppsList');
+
+                if (result.success && result.running_apps.length > 0) {
+                    container.innerHTML = result.running_apps.map(app => `
+                        <div class="app-item">
+                            <div class="app-info">
+                                <div class="app-name">${app.app_type.replace('_', ' ')} (${app.app_id.substring(0, 8)}...)</div>
+                                <div class="app-details">
+                                    PID: ${app.pid} | 
+                                    Running: ${Math.floor(app.running_time / 60)}m ${Math.floor(app.running_time % 60)}s |
+                                    <span class="status-badge status-${app.status}">${app.status}</span>
+                                </div>
+                            </div>
+                            <div class="app-actions">
+                                <button class="btn btn-danger btn-small" onclick="terminateApp('${app.app_id}')">
+                                    ❌ Stop
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">No applications currently running</p>';
+                }
+            } catch (error) {
+                console.error('Failed to refresh running apps:', error);
+            }
+        }
+
+        // Terminate application
+        async function terminateApp(appId) {
+            try {
+                const response = await fetch('/api/v1/apps/terminate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        app_id: appId
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    refreshRunningApps();
+                } else {
+                    alert(`Failed to terminate application: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Utility functions
+        function setLoading(type, loading) {
+            const btn = document.getElementById(type + 'Btn');
+            const btnText = document.getElementById(type + 'BtnText');
+            const loadingEl = document.getElementById(type + 'Loading');
+            
+            if (loading) {
+                btn.disabled = true;
+                btnText.style.display = 'none';
+                loadingEl.style.display = 'flex';
+            } else {
+                btn.disabled = false;
+                btnText.style.display = 'flex';
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${type}`;
+            element.textContent = message;
+            element.style.display = 'block';
+        }
+
+        // Auto-refresh running apps every 30 seconds
+        setInterval(refreshRunningApps, 30000);
+        
+        // Initial load
+        refreshRunningApps();
+    </script>
+</body>
+</html>

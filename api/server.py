@@ -199,6 +199,19 @@ class APIServer:
             else:
                 raise HTTPException(status_code=404, detail="GitHub interface not found")
         
+        # Prompt-to-App Frontend
+        @self.app.get("/apps")
+        async def prompt_to_app_interface():
+            """Serve prompt-to-app frontend"""
+            from fastapi.responses import FileResponse
+            import os
+            
+            html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ui", "prompt_to_app.html")
+            if os.path.exists(html_path):
+                return FileResponse(html_path, media_type="text/html")
+            else:
+                raise HTTPException(status_code=404, detail="Prompt-to-app interface not found")
+        
         # Dashboard endpoint  
         @self.app.get("/dashboard")
         async def dashboard():
@@ -334,6 +347,24 @@ class APIServer:
                     </div>
                     
                     <div class="main-grid">
+                        <!-- Prompt-to-App Card -->
+                        <div class="card">
+                            <div class="card-title">
+                                <span class="card-icon">🚀</span>
+                                Prompt-to-App Generator
+                            </div>
+                            <p>Transform natural language descriptions into fully functional applications. Generate, launch, and manage complete applications from simple prompts.</p>
+                            <ul class="feature-list">
+                                <li>Natural Language to App</li>
+                                <li>Instant Application Launch</li>
+                                <li>GUI Applications</li>
+                                <li>Process Management</li>
+                            </ul>
+                            <div class="quick-actions">
+                                <a href="/apps" class="btn">🚀 Open App Generator</a>
+                            </div>
+                        </div>
+
                         <!-- GitHub Integration Card -->
                         <div class="card">
                             <div class="card-title">
@@ -1555,6 +1586,254 @@ class APIServer:
             except Exception as e:
                 self.logger.error(f"Repository listing failed: {e}")
                 raise HTTPException(status_code=500, detail=f"Repository listing failed: {str(e)}")
+        
+        # Prompt-to-App Endpoints
+        @self.app.post("/api/v1/apps/generate")
+        async def generate_application(request: Dict[str, Any]):
+            """Generate complete application from prompt"""
+            try:
+                prompt = request.get("prompt", "")
+                app_type = request.get("app_type", "auto")  # auto, calculator, editor, game, etc.
+                
+                if not prompt:
+                    raise HTTPException(status_code=400, detail="Prompt is required")
+                
+                # Get the application generator agent
+                app_generator = self.coordinator.agents.get('application_generator')
+                if not app_generator:
+                    raise HTTPException(status_code=503, detail="Application generator not available")
+                
+                # Execute application generation
+                result = await asyncio.wait_for(
+                    app_generator.execute_task({
+                        "task_type": "generate_application",
+                        "prompt": prompt,
+                        "app_type": app_type,
+                        "include_launcher": True
+                    }),
+                    timeout=120.0
+                )
+                
+                if result.get('status') == 'error':
+                    raise HTTPException(status_code=400, detail=result.get('error', 'Generation failed'))
+                
+                return {
+                    "success": True,
+                    "app_id": result.get('app_id'),
+                    "app_type": result.get('app_type'),
+                    "prompt": prompt,
+                    "generated_files": result.get('generated_files', []),
+                    "executable_path": result.get('executable_path'),
+                    "requirements": result.get('requirements', []),
+                    "launch_ready": result.get('launch_ready', False),
+                    "generated_at": datetime.utcnow().isoformat(),
+                    "message": "Application generated successfully"
+                }
+                
+            except asyncio.TimeoutError:
+                raise HTTPException(status_code=408, detail="Application generation timed out")
+            except Exception as e:
+                self.logger.error(f"Application generation failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+        
+        @self.app.post("/api/v1/apps/launch")
+        async def launch_application(request: Dict[str, Any]):
+            """Launch a generated application"""
+            try:
+                app_id = request.get("app_id")
+                executable_path = request.get("executable_path")
+                
+                if not executable_path:
+                    raise HTTPException(status_code=400, detail="executable_path is required")
+                
+                # Import and get the launcher service
+                from integrations.application_launcher import get_launcher
+                launcher = get_launcher()
+                
+                # Launch the application
+                result = await launcher.launch_application({
+                    "app_id": app_id,
+                    "executable_path": executable_path,
+                    "app_type": request.get("app_type", "unknown")
+                })
+                
+                if result.get('status') == 'error':
+                    raise HTTPException(status_code=400, detail=result.get('error', 'Launch failed'))
+                
+                return {
+                    "success": True,
+                    "app_id": result.get('app_id'),
+                    "process_id": result.get('process_id'),
+                    "launch_time": result.get('launch_time'),
+                    "status": "running",
+                    "message": "Application launched successfully"
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Application launch failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Launch failed: {str(e)}")
+        
+        @self.app.get("/api/v1/apps/running")
+        async def list_running_applications():
+            """List all currently running applications"""
+            try:
+                from integrations.application_launcher import get_launcher
+                launcher = get_launcher()
+                
+                result = await launcher.list_running_apps()
+                
+                return {
+                    "success": True,
+                    "running_apps": result.get('running_apps', []),
+                    "total_count": result.get('total_count', 0),
+                    "max_apps": result.get('max_apps', 5)
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Failed to list running apps: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to list apps: {str(e)}")
+        
+        @self.app.post("/api/v1/apps/terminate")
+        async def terminate_application(request: Dict[str, Any]):
+            """Terminate a running application"""
+            try:
+                app_id = request.get("app_id")
+                
+                if not app_id:
+                    raise HTTPException(status_code=400, detail="app_id is required")
+                
+                from integrations.application_launcher import get_launcher
+                launcher = get_launcher()
+                
+                result = await launcher.terminate_application(app_id)
+                
+                if result.get('status') == 'error':
+                    raise HTTPException(status_code=400, detail=result.get('error', 'Termination failed'))
+                
+                return {
+                    "success": True,
+                    "app_id": app_id,
+                    "status": "terminated",
+                    "message": "Application terminated successfully"
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Application termination failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Termination failed: {str(e)}")
+        
+        @self.app.get("/api/v1/apps/{app_id}/status")
+        async def get_application_status(app_id: str):
+            """Get status of a specific application"""
+            try:
+                from integrations.application_launcher import get_launcher
+                launcher = get_launcher()
+                
+                result = await launcher.get_app_status(app_id)
+                
+                if result.get('status') == 'error':
+                    raise HTTPException(status_code=404, detail=result.get('error', 'Application not found'))
+                
+                return {
+                    "success": True,
+                    "app_status": result
+                }
+                
+            except HTTPException:
+                raise
+            except Exception as e:
+                self.logger.error(f"Failed to get app status: {e}")
+                raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
+        
+        @self.app.post("/api/v1/apps/generate-and-launch")
+        async def generate_and_launch_application(request: Dict[str, Any]):
+            """Generate and immediately launch an application"""
+            try:
+                prompt = request.get("prompt", "")
+                app_type = request.get("app_type", "auto")
+                
+                if not prompt:
+                    raise HTTPException(status_code=400, detail="Prompt is required")
+                
+                # Step 1: Generate application
+                app_generator = self.coordinator.agents.get('application_generator')
+                if not app_generator:
+                    raise HTTPException(status_code=503, detail="Application generator not available")
+                
+                generation_result = await asyncio.wait_for(
+                    app_generator.execute_task({
+                        "task_type": "generate_application",
+                        "prompt": prompt,
+                        "app_type": app_type,
+                        "include_launcher": True
+                    }),
+                    timeout=120.0
+                )
+                
+                if generation_result.get('status') == 'error':
+                    raise HTTPException(status_code=400, detail=generation_result.get('error', 'Generation failed'))
+                
+                # Step 2: Launch application
+                if generation_result.get('launch_ready'):
+                    from integrations.application_launcher import get_launcher
+                    launcher = get_launcher()
+                    
+                    launch_result = await launcher.launch_application({
+                        "app_id": generation_result.get('app_id'),
+                        "executable_path": generation_result.get('executable_path'),
+                        "app_type": generation_result.get('app_type')
+                    })
+                    
+                    return {
+                        "success": True,
+                        "generation": {
+                            "app_id": generation_result.get('app_id'),
+                            "app_type": generation_result.get('app_type'),
+                            "generated_files": generation_result.get('generated_files', []),
+                            "requirements": generation_result.get('requirements', [])
+                        },
+                        "launch": {
+                            "app_id": launch_result.get('app_id'),
+                            "process_id": launch_result.get('process_id'),
+                            "status": launch_result.get('status'),
+                            "launch_time": launch_result.get('launch_time')
+                        },
+                        "prompt": prompt,
+                        "message": "Application generated and launched successfully"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "generation": generation_result,
+                        "launch": None,
+                        "message": "Application generated but not ready for launch",
+                        "error": "Launch preparation failed"
+                    }
+                
+            except asyncio.TimeoutError:
+                raise HTTPException(status_code=408, detail="Application generation timed out")
+            except Exception as e:
+                self.logger.error(f"Generate and launch failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Generate and launch failed: {str(e)}")
+        
+        @self.app.delete("/api/v1/apps/cleanup")
+        async def cleanup_finished_applications():
+            """Clean up finished applications"""
+            try:
+                from integrations.application_launcher import get_launcher
+                launcher = get_launcher()
+                
+                result = await launcher.cleanup_finished_apps()
+                
+                return {
+                    "success": True,
+                    "cleaned_up": result.get('cleaned_up', []),
+                    "count": result.get('count', 0),
+                    "message": f"Cleaned up {result.get('count', 0)} finished applications"
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Cleanup failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
     
     async def start(self):
         """Start the API server"""
