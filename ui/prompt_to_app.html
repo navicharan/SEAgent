@@ -644,6 +644,97 @@
             border-left: 4px solid #27ae60;
         }
 
+        /* Code Display Styles */
+        .code-display-section {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .code-output {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin-top: 15px;
+            border: 1px solid #34495e;
+        }
+
+        .files-list {
+            margin-top: 15px;
+        }
+
+        .file-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-item:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .file-item.active {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .file-name {
+            font-weight: bold;
+            color: #2c3e50;
+            font-family: 'Courier New', monospace;
+        }
+
+        .file-size {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .file-preview {
+            color: #495057;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.4;
+            max-height: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.875em;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+            background: #f8f9fa;
+            color: #495057;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-small:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
         @media (max-width: 768px) {
             .main-container {
                 grid-template-columns: 1fr;
@@ -714,6 +805,25 @@
                 </form>
 
                 <div class="result" id="generateResult"></div>
+
+                <!-- Generated Code Display -->
+                <div id="codeDisplaySection" class="code-display-section" style="display: none; margin-top: 20px;">
+                    <div class="card-title">
+                        <span class="card-icon">📄</span>
+                        Generated Code Files
+                        <button class="btn btn-small" onclick="toggleCodeDisplay()" id="toggleCodeBtn" style="margin-left: auto; width: auto;">
+                            👁️ Show Code
+                        </button>
+                    </div>
+                    
+                    <div id="codeOutput" class="code-output" style="display: none;">
+                        <!-- Generated code will be displayed here -->
+                    </div>
+                    
+                    <div id="filesList" class="files-list">
+                        <!-- File list will be populated here -->
+                    </div>
+                </div>
 
                 <!-- Example Prompts -->
                 <div class="examples">
@@ -1135,6 +1245,10 @@
 
                 if (result.success) {
                     currentApp = result;
+                    
+                    // Display generated code
+                    displayGeneratedCode(result.all_files || {});
+                    
                     showResult('generateResult', 
                         `✅ Application generated successfully!\n` +
                         `Type: ${result.app_type}\n` +
@@ -1443,6 +1557,32 @@
             setLoading('security', true);
 
             try {
+                // Extract main logic file for consistent analysis
+                const mainLogicFile = getMainLogicFile(currentApp.all_files || {});
+                
+                console.log('Security Analysis Debug:');
+                console.log('- Available files:', Object.keys(currentApp.all_files || {}));
+                console.log('- Selected main file:', mainLogicFile.path);
+                console.log('- Content length:', mainLogicFile.content ? mainLogicFile.content.length : 0);
+                console.log('- Content preview:', mainLogicFile.content ? mainLogicFile.content.substring(0, 200) + '...' : 'No content');
+                
+                // Validate we have content to analyze
+                if (!mainLogicFile.content || mainLogicFile.content.trim().length < 10) {
+                    showResult('securityResult', 
+                        `❌ No valid code content found for analysis.\n` +
+                        `Available files: ${Object.keys(currentApp.all_files || {}).join(', ')}\n` +
+                        `Selected file: ${mainLogicFile.name}\n` +
+                        `Content length: ${mainLogicFile.content ? mainLogicFile.content.length : 0}`,
+                        'error'
+                    );
+                    return;
+                }
+                
+                console.log('📨 Sending security analysis request with:', {
+                    code_content_length: mainLogicFile.content.length,
+                    file_path: mainLogicFile.name
+                });
+                
                 const response = await fetch('/api/v1/security/analyze', {
                     method: 'POST',
                     headers: {
@@ -1450,16 +1590,19 @@
                     },
                     body: JSON.stringify({
                         app_id: currentApp.app_id,
-                        file_path: currentApp.executable_path,
-                        code_content: currentApp.code_content || null
+                        file_path: mainLogicFile.path || currentApp.executable_path,
+                        code_content: mainLogicFile.content || currentApp.code_content || null
                     })
                 });
 
                 const result = await response.json();
 
                 if (result.success) {
+                    const mainFile = getMainLogicFile(currentApp.all_files || {});
                     showResult('securityResult', 
-                        `✅ Comprehensive analysis completed! Quality Score: ${Math.round(result.security_score)}%`, 
+                        `✅ Comprehensive analysis completed!\n` +
+                        `Analyzed File: ${mainFile.path || 'Unknown'}\n` +
+                        `Quality Score: ${Math.round(result.security_score)}%`, 
                         'success'
                     );
                     
@@ -1535,9 +1678,12 @@
                 recommendations.map(r => `<div style="margin-bottom: 8px;">• ${r}</div>`).join('');
             
             // Update detailed analysis
+            const mainFile = getMainLogicFile(currentApp.all_files || {});
             let analysisContent = `
                 <div style="margin-bottom: 20px;">
                     <h4>Quality Assessment Summary</h4>
+                    <p><strong>Analyzed File:</strong> <code>${mainFile.path || 'Unknown'}</code> 
+                    ${mainFile.content ? `(${Math.round(mainFile.content.length / 1024 * 100) / 100} KB)` : ''}</p>
                     <p>Your application has achieved an overall quality score of <strong>${overallScore}%</strong>. 
                     Here's how it performed across different evaluation criteria:</p>
                     <ul style="line-height: 1.8;">
@@ -1846,6 +1992,127 @@ ${currentApp.executable_path ? `Run the main file: \`${currentApp.executable_pat
             
             content.textContent = structure;
             preview.style.display = 'block';
+        }
+
+        // Code Display Functions
+        function displayGeneratedCode(files) {
+            const codeDisplaySection = document.getElementById('codeDisplaySection');
+            const filesList = document.getElementById('filesList');
+            const codeOutput = document.getElementById('codeOutput');
+            
+            if (!files || Object.keys(files).length === 0) {
+                codeDisplaySection.style.display = 'none';
+                return;
+            }
+            
+            // Show the code display section
+            codeDisplaySection.style.display = 'block';
+            
+            // Create file list
+            filesList.innerHTML = '';
+            Object.entries(files).forEach(([filename, content], index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.onclick = () => showFileContent(filename, content, fileItem);
+                
+                const fileSize = content ? Math.round(content.length / 1024 * 100) / 100 : 0;
+                const preview = content ? content.substring(0, 200).replace(/\n/g, ' ') : 'Empty file';
+                
+                fileItem.innerHTML = `
+                    <div class="file-header">
+                        <div class="file-name">📄 ${filename}</div>
+                        <div class="file-size">${fileSize} KB</div>
+                    </div>
+                    <div class="file-preview">${preview}${content && content.length > 200 ? '...' : ''}</div>
+                `;
+                
+                filesList.appendChild(fileItem);
+                
+                // Auto-select first file
+                if (index === 0) {
+                    showFileContent(filename, content, fileItem);
+                }
+            });
+        }
+
+        function showFileContent(filename, content, fileElement) {
+            // Remove active class from all file items
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Add active class to selected file
+            fileElement.classList.add('active');
+            
+            // Show content in code output
+            const codeOutput = document.getElementById('codeOutput');
+            codeOutput.textContent = `// ==================== ${filename} ====================\n\n${content || 'Empty file'}`;
+            
+            // Show code output if it's hidden
+            if (codeOutput.style.display === 'none') {
+                codeOutput.style.display = 'block';
+                document.getElementById('toggleCodeBtn').textContent = '👁️ Hide Code';
+            }
+        }
+
+        function toggleCodeDisplay() {
+            const codeOutput = document.getElementById('codeOutput');
+            const toggleBtn = document.getElementById('toggleCodeBtn');
+            
+            if (codeOutput.style.display === 'none') {
+                codeOutput.style.display = 'block';
+                toggleBtn.textContent = '👁️ Hide Code';
+            } else {
+                codeOutput.style.display = 'none';
+                toggleBtn.textContent = '👁️ Show Code';
+            }
+        }
+
+        // Get main logic file for security analysis
+        function getMainLogicFile(allFiles) {
+            if (!allFiles || Object.keys(allFiles).length === 0) {
+                return { path: null, content: null };
+            }
+            
+            // Priority order for main logic file selection
+            const priorities = [
+                // Python files with common main patterns (including auto.py)
+                /^(main|app|run|server|application|game|utility|web_app|calculator|todo|dashboard|auto)\.py$/i,
+                // Any Python file that's not requirements or README
+                /^(?!requirements|readme)[^/]*\.py$/i,
+                // JavaScript files
+                /^(main|app|index|script)\.js$/i,
+                // HTML files (for web apps)
+                /^(index|main|app)\.html$/i,
+                // Any other Python files
+                /\.py$/i,
+                // Any programming files
+                /\.(js|html|css|java|cpp|c|go|rs)$/i
+            ];
+            
+            // Try each priority pattern
+            for (const pattern of priorities) {
+                for (const [filename, content] of Object.entries(allFiles)) {
+                    if (pattern.test(filename)) {
+                        console.log(`Selected main file: ${filename} (${content ? content.length : 0} chars)`);
+                        return {
+                            path: filename,
+                            content: content
+                        };
+                    }
+                }
+            }
+            
+            // Fallback: select the largest file
+            let largestFile = { path: null, content: null, size: 0 };
+            for (const [filename, content] of Object.entries(allFiles)) {
+                if (content && content.length > largestFile.size && !filename.match(/\.(txt|md|json|yml|yaml)$/i)) {
+                    largestFile = { path: filename, content: content, size: content.length };
+                }
+            }
+            
+            console.log(`Fallback to largest file: ${largestFile.path} (${largestFile.size} chars)`);
+            return largestFile;
         }
 
         // Enhanced utility functions for new features

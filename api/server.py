@@ -192,19 +192,7 @@ class APIServer:
             """Health check endpoint"""
             return {"status": "healthy", "service": "SEAgent API"}
         
-        # GitHub Integration Frontend
-        @self.app.get("/github")
-        async def github_interface():
-            """Serve GitHub integration frontend"""
-            from fastapi.responses import FileResponse
-            import os
-            
-            html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ui", "github_integration.html")
-            if os.path.exists(html_path):
-                return FileResponse(html_path, media_type="text/html")
-            else:
-                raise HTTPException(status_code=404, detail="GitHub interface not found")
-        
+
         # Prompt-to-App Frontend
         @self.app.get("/apps")
         async def prompt_to_app_interface():
@@ -289,15 +277,59 @@ class APIServer:
                         background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
                     }
                     .status-grid { 
-                        display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
-                        gap: 15px; margin-top: 20px; 
+                        display: flex;
+                        flex-wrap: wrap;
+                        justify-content: center;
+                        align-items: center;
+                        gap: 8px; 
+                        margin-top: 20px; 
                     }
                     .status-card { 
-                        background: #f8f9fa; border-radius: 10px; padding: 20px; 
-                        border-left: 4px solid #28a745; text-align: center;
+                        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                        border-radius: 20px; 
+                        padding: 12px 16px; 
+                        border: 2px solid #28a745;
+                        text-align: center;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                        min-width: 120px;
+                        max-width: 140px;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
                     }
-                    .status-title { font-weight: bold; color: #495057; margin-bottom: 8px; }
-                    .status-value { font-size: 1.2em; color: #28a745; font-weight: bold; }
+                    .status-card:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                    }
+                    .status-card.inactive {
+                        border-color: #dc3545;
+                        background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+                    }
+                    .status-title { 
+                        font-weight: 600; 
+                        color: #2d3748; 
+                        margin-bottom: 4px;
+                        font-size: 0.75em;
+                        text-transform: capitalize;
+                        line-height: 1.2;
+                        text-align: center;
+                    }
+                    .status-value { 
+                        font-size: 0.7em; 
+                        font-weight: 600;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 3px;
+                    }
+                    .status-value.active { color: #22c55e; }
+                    .status-value.inactive { color: #ef4444; }
+                    .agent-icon { 
+                        font-size: 1.1em; 
+                        margin-right: 2px; 
+                    }
                     .feature-list {
                         list-style: none; padding: 0; margin: 15px 0;
                     }
@@ -338,7 +370,7 @@ class APIServer:
                         
                         <div class="stats-row" id="systemStats">
                             <div class="stat-item">
-                                <span class="stat-number" id="agentCount">6</span>
+                                <span class="stat-number" id="agentCount">7</span>
                                 <span class="stat-label">Active Agents</span>
                             </div>
                             <div class="stat-item">
@@ -371,24 +403,7 @@ class APIServer:
                             </div>
                         </div>
 
-                        <!-- GitHub Integration Card -->
-                        <div class="card">
-                            <div class="card-title">
-                                <span class="card-icon">🐙</span>
-                                GitHub Integration
-                            </div>
-                            <p>Generate code with AI and upload directly to GitHub repositories. Create projects, manage files, and automate your development workflow.</p>
-                            <ul class="feature-list">
-                                <li>AI Code Generation</li>
-                                <li>Direct GitHub Upload</li>
-                                <li>Repository Management</li>
-                                <li>Pull Request Creation</li>
-                            </ul>
-                            <div class="quick-actions">
-                                <a href="/github" class="btn btn-github">🚀 Open GitHub Integration</a>
-                            </div>
-                        </div>
-                        
+
                         <!-- Agent Status Card -->
                         <div class="card">
                             <div class="card-title">
@@ -473,12 +488,39 @@ class APIServer:
                             let html = '';
                             let activeCount = 0;
                             
-                            for (const [agentName, status] of Object.entries(data)) {
-                                if (status.initialized) activeCount++;
+                            // Agent icons mapping
+                            const agentIcons = {
+                                'code_generation': '🚀',
+                                'security_analysis': '🔒',
+                                'debug': '🐛',
+                                'performance': '⚡',
+                                'integration': '🔗',
+                                'testing': '🧪',
+                                'cicd': '🔄',
+                                'application_generator': '🏗️'
+                            };
+                            
+                            // Filter out application_generator and sort agents by name for consistent display
+                            const filteredAgents = Object.entries(data).filter(([agentName]) => agentName !== 'application_generator');
+                            const sortedAgents = filteredAgents.sort(([a], [b]) => a.localeCompare(b));
+                            
+                            for (const [agentName, status] of sortedAgents) {
+                                const isActive = status.initialized;
+                                if (isActive) activeCount++;
+                                const displayName = agentName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                const icon = agentIcons[agentName] || '🤖';
+                                
                                 html += `
-                                    <div class="status-card">
-                                        <div class="status-title">${agentName.replace('_', ' ')}</div>
-                                        <div class="status-value">${status.initialized ? '✅ Active' : '❌ Inactive'}</div>
+                                    <div class="status-card ${isActive ? 'active' : 'inactive'}">
+                                        <div class="status-title">
+                                            ${icon}
+                                        </div>
+                                        <div class="status-title">
+                                            ${displayName}
+                                        </div>
+                                        <div class="status-value ${isActive ? 'active' : 'inactive'}">
+                                            ${isActive ? '●' : '○'} ${isActive ? 'Active' : 'Inactive'}
+                                        </div>
                                     </div>
                                 `;
                             }
@@ -487,8 +529,9 @@ class APIServer:
                             document.getElementById('agentCount').textContent = activeCount;
                             
                         } catch (error) {
+                            console.error('Failed to load agent status:', error);
                             document.getElementById('agentStatusGrid').innerHTML = 
-                                '<div class="status-card"><div class="status-title">Error</div><div class="status-value">Failed to load</div></div>';
+                                '<div class="status-card inactive"><div class="status-title">⚠️ Error</div><div class="status-value inactive">Failed to load</div></div>';
                         }
                     }
                     
@@ -973,6 +1016,11 @@ class APIServer:
                             code_content = f.read()
                     except Exception as e:
                         raise HTTPException(status_code=400, detail=f"Could not read file: {e}")
+                
+                # Debug logging
+                self.logger.info(f"Security analysis request - file_path: {request.file_path}")
+                self.logger.info(f"Code content length: {len(code_content) if code_content else 0}")
+                self.logger.info(f"Code content preview: {code_content[:200] if code_content else 'EMPTY'}...")
                 
                 # Run security analysis
                 result = await security_agent.execute_task({

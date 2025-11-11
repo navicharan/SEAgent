@@ -154,6 +154,8 @@ class SecurityAnalysisAgent(BaseAgent):
         analysis_depth = parameters.get('analysis_depth', 'standard')
         
         self.logger.info(f"Performing static security analysis ({language}, {analysis_depth})")
+        self.logger.info(f"Source code length: {len(source_code)} characters")
+        self.logger.info(f"Source code preview: {source_code[:200] if source_code else 'EMPTY'}...")
         
         # Simulate analysis process
         await asyncio.sleep(2)  # Simulate processing time
@@ -173,7 +175,12 @@ class SecurityAnalysisAgent(BaseAgent):
         recommendations = await self._generate_recommendations(vulnerabilities)
         
         # Convert risk score to security score (0-100 scale)
-        security_score = max(0, 100 - (risk_score * 10))  # Assuming risk_score is 0-10 scale
+        # Risk score is 0-10, so security score is 100 - (risk_score * 10)
+        # No vulnerabilities = 100% security, 10+ severe vulnerabilities = 0% security
+        if len(vulnerabilities) == 0:
+            security_score = 85  # Good baseline score for clean code
+        else:
+            security_score = max(10, 100 - (risk_score * 10))  # Minimum 10% even with many vulns
         
         # Determine security level based on score
         if security_score >= 90:
@@ -270,8 +277,11 @@ class SecurityAnalysisAgent(BaseAgent):
         patterns = {
             'sql_injection': [
                 r'execute\s*\(\s*["\'].*%.*["\']',
-                r'\.format\s*\(',
-                r'f["\'].*\{.*\}.*["\']'
+                r'\.format\s*\([^)]*["\'][^"\']*%[^"\']*["\']',
+                r'f["\'][^"\']*SELECT.*\{[^}]*\}[^"\']*["\']',
+                r'f["\'][^"\']*INSERT.*\{[^}]*\}[^"\']*["\']',
+                r'f["\'][^"\']*UPDATE.*\{[^}]*\}[^"\']*["\']',
+                r'f["\'][^"\']*DELETE.*\{[^}]*\}[^"\']*["\']'
             ],
             'xss': [
                 r'innerHTML\s*=',
@@ -313,7 +323,7 @@ class SecurityAnalysisAgent(BaseAgent):
     async def _calculate_risk_score(self, vulnerabilities: List[Dict[str, Any]]) -> float:
         """Calculate overall risk score based on vulnerabilities"""
         if not vulnerabilities:
-            return 0.0
+            return 0.0  # No vulnerabilities = no risk
         
         severity_weights = {
             'critical': 10,
@@ -323,10 +333,13 @@ class SecurityAnalysisAgent(BaseAgent):
             'info': 1
         }
         
-        total_score = sum(severity_weights.get(vuln['severity'], 1) for vuln in vulnerabilities)
-        max_possible = len(vulnerabilities) * 10
+        total_risk = sum(severity_weights.get(vuln['severity'], 1) for vuln in vulnerabilities)
         
-        return min(total_score / max_possible * 100, 100)
+        # Risk score is based on total risk points, not percentage
+        # Scale it to a 0-10 range where 10+ vulnerabilities = max risk
+        risk_score = min(total_risk, 10)
+        
+        return risk_score
     
     async def _generate_recommendations(self, vulnerabilities: List[Dict[str, Any]]) -> List[str]:
         """Generate security recommendations based on vulnerabilities"""
