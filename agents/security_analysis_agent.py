@@ -136,7 +136,7 @@ class SecurityAnalysisAgent(BaseAgent):
         
         task_type = parameters.get('task_type', 'static_analysis')
         
-        if task_type == 'static_analysis':
+        if task_type in ['static_analysis', 'analyze_code']:
             return await self._static_analysis(parameters)
         elif task_type == 'dependency_scan':
             return await self._dependency_scan(parameters)
@@ -172,10 +172,29 @@ class SecurityAnalysisAgent(BaseAgent):
         risk_score = await self._calculate_risk_score(vulnerabilities)
         recommendations = await self._generate_recommendations(vulnerabilities)
         
+        # Convert risk score to security score (0-100 scale)
+        security_score = max(0, 100 - (risk_score * 10))  # Assuming risk_score is 0-10 scale
+        
+        # Determine security level based on score
+        if security_score >= 90:
+            security_level = "Excellent"
+        elif security_score >= 80:
+            security_level = "Good"
+        elif security_score >= 60:
+            security_level = "Fair"
+        elif security_score >= 40:
+            security_level = "Poor"
+        else:
+            security_level = "Critical"
+        
         return {
+            'success': True,
             'vulnerabilities': vulnerabilities,
             'risk_score': risk_score,
+            'security_score': security_score,
+            'security_level': security_level,
             'recommendations': recommendations,
+            'summary': f"Security analysis completed. Found {len(vulnerabilities)} issues. Security level: {security_level}",
             'analysis_depth': analysis_depth,
             'ai_enhanced': bool(self.deepseek_client and analysis_depth in ['comprehensive', 'ai-enhanced']),
             'scan_timestamp': asyncio.get_event_loop().time()

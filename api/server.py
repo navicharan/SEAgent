@@ -67,6 +67,12 @@ class SecurityScanRequest(BaseModel):
     scan_type: str = "comprehensive"
 
 
+class SecurityAnalysisRequest(BaseModel):
+    app_id: str
+    file_path: str
+    code_content: Optional[str] = None
+
+
 class DebugRequest(BaseModel):
     source_code: str
     error_log: Optional[str] = None
@@ -940,6 +946,72 @@ class APIServer:
                 "message": "Security scan started"
             }
         
+        @self.app.post("/api/v1/security/analyze")
+        async def security_analyze(request: SecurityAnalysisRequest):
+            """Analyze security of generated application code"""
+            try:
+                # Get security agent
+                self.logger.info(f"Available agents: {list(self.coordinator.agents.keys())}")
+                security_agent = self.coordinator.agents.get('security_analysis')
+                self.logger.info(f"Security agent found: {security_agent is not None}")
+                if security_agent:
+                    self.logger.info(f"Security agent initialized: {security_agent.is_initialized}")
+                
+                if not security_agent:
+                    raise HTTPException(status_code=500, detail="Security analysis agent not available")
+                
+                if not security_agent.is_initialized:
+                    self.logger.info("Initializing security agent...")
+                    await security_agent.initialize()
+                    self.logger.info("Security agent initialization completed")
+                
+                # Read code from file if not provided
+                code_content = request.code_content
+                if not code_content and request.file_path:
+                    try:
+                        with open(request.file_path, 'r', encoding='utf-8') as f:
+                            code_content = f.read()
+                    except Exception as e:
+                        raise HTTPException(status_code=400, detail=f"Could not read file: {e}")
+                
+                # Run security analysis
+                result = await security_agent.execute_task({
+                    "task_type": "analyze_code",
+                    "source_code": code_content,
+                    "file_path": request.file_path,
+                    "analysis_type": "comprehensive"
+                })
+                
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "security_score": result.get("security_score", 85),
+                        "security_level": result.get("security_level", "Good"),
+                        "vulnerabilities": result.get("vulnerabilities", []),
+                        "recommendations": result.get("recommendations", []),
+                        "analysis_summary": result.get("summary", "Analysis completed")
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": result.get("error", "Security analysis failed"),
+                        "security_score": 0,
+                        "security_level": "Unknown",
+                        "vulnerabilities": [],
+                        "recommendations": []
+                    }
+                    
+            except Exception as e:
+                self.logger.error(f"Security analysis error: {e}")
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "security_score": 0,
+                    "security_level": "Error",
+                    "vulnerabilities": [],
+                    "recommendations": []
+                }
+        
         @self.app.post("/api/v1/debug")
         async def debug_code(request: DebugRequest):
             task = Task(
@@ -1346,9 +1418,9 @@ class APIServer:
                 self.logger.error(f"Deployment listing failed: {e}")
                 raise HTTPException(status_code=500, detail=f"Deployment listing failed: {str(e)}")
 
-        @self.app.post("/api/v1/github/upload/direct")
-        async def upload_to_github(request: GitHubUploadRequest):
-            """Upload generated code to GitHub repository"""
+        @self.app.post("/api/v1/github/upload")
+        async def upload_to_github_queue(request: GitHubUploadRequest):
+            """Upload generated code to GitHub repository via task queue"""
             try:
                 # Get the integration agent
                 integration_agent = self.coordinator.agents.get('integration')
@@ -1388,7 +1460,7 @@ class APIServer:
             except Exception as e:
                 self.logger.error(f"GitHub upload failed: {e}")
                 raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-        
+
         @self.app.post("/api/v1/github/upload/direct")
         async def upload_to_github_direct(request: GitHubUploadRequest):
             """Upload files to GitHub repository directly (no task queue)"""
@@ -1617,6 +1689,27 @@ class APIServer:
                 if result.get('status') == 'error':
                     raise HTTPException(status_code=400, detail=result.get('error', 'Generation failed'))
                 
+                # Collect all file contents for GitHub integration
+                all_files = {}
+                try:
+                    # Add main executable file
+                    if result.get('executable_path'):
+                        with open(result.get('executable_path'), 'r', encoding='utf-8') as f:
+                            all_files[os.path.basename(result.get('executable_path'))] = f.read()
+                    
+                    # Add generated code
+                    if result.get('code'):
+                        filename = result.get('filename', 'main.py')
+                        all_files[filename] = result.get('code')
+                    
+                    # Add requirements.txt if requirements exist
+                    if result.get('requirements'):
+                        requirements_text = '\n'.join(result.get('requirements'))
+                        all_files['requirements.txt'] = requirements_text
+                        
+                except Exception as e:
+                    self.logger.warning(f"Could not collect all file contents: {e}")
+                
                 return {
                     "success": True,
                     "app_id": result.get('app_id'),
@@ -1627,6 +1720,9 @@ class APIServer:
                     "requirements": result.get('requirements', []),
                     "launch_ready": result.get('launch_ready', False),
                     "generated_at": datetime.utcnow().isoformat(),
+                    "features": result.get('features', []),
+                    "code_content": result.get('code', ''),
+                    "all_files": all_files,  # For GitHub integration
                     "message": "Application generated successfully"
                 }
                 
@@ -1666,7 +1762,9 @@ class APIServer:
                     "process_id": result.get('process_id'),
                     "launch_time": result.get('launch_time'),
                     "status": "running",
-                    "message": "Application launched successfully"
+                    "message": "Application launched successfully",
+                    "url": result.get('url'),
+                    "is_web_app": result.get('is_web_app', False)
                 }
                 
             except Exception as e:
@@ -1795,7 +1893,9 @@ class APIServer:
                             "app_id": launch_result.get('app_id'),
                             "process_id": launch_result.get('process_id'),
                             "status": launch_result.get('status'),
-                            "launch_time": launch_result.get('launch_time')
+                            "launch_time": launch_result.get('launch_time'),
+                            "url": launch_result.get('url'),
+                            "is_web_app": launch_result.get('is_web_app', False)
                         },
                         "prompt": prompt,
                         "message": "Application generated and launched successfully"

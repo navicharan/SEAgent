@@ -80,3 +80,15 @@ coverage.xml
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Testing and debugging files
+test_*.py
+verify_*.py
+debug_*.py
+check_*.py
+final_*.py
+quick_*.py
+*_solution.py
+
+# Generated applications temp directory
+seagent_apps/

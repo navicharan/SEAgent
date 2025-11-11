@@ -545,7 +545,47 @@ class IntegrationAgent(BaseAgent):
             return result
             
         except Exception as e:
+            error_str = str(e)
             self.logger.error(f"GitHub upload failed: {e}")
+            
+            # If repository doesn't exist, try to create it
+            if "not found" in error_str.lower() and repo_name == "generated_apps":
+                self.logger.info(f"Repository {repo_name} not found, attempting to create it...")
+                try:
+                    # Create the repository
+                    repo_result = await self.github_integration.create_repository(
+                        repo_name, 
+                        "Repository for storing AI-generated applications from SEAgent",
+                        False,  # public
+                        True,   # auto_init
+                        "Python",  # gitignore_template
+                        None    # license_template
+                    )
+                    
+                    self.logger.info(f"Successfully created repository: {repo_name}")
+                    
+                    # Now try the upload again
+                    upload_result = await self.github_integration.upload_files_to_repository(
+                        repo_name, owner, files, commit_message, branch
+                    )
+                    
+                    result = {
+                        'upload_status': 'success',
+                        'repository': f"{owner}/{repo_name}",
+                        'branch': branch,
+                        'commit_sha': upload_result.get('commit_sha'),
+                        'files_uploaded': list(files.keys()),
+                        'upload_timestamp': asyncio.get_event_loop().time(),
+                        'repository_created': True,
+                        'repository_url': repo_result.get('html_url')
+                    }
+                    
+                    return result
+                    
+                except Exception as create_error:
+                    self.logger.error(f"Failed to create repository: {create_error}")
+                    return await self._simulate_github_upload(repo_name, owner, files)
+            
             return await self._simulate_github_upload(repo_name, owner, files)
     
     async def _create_github_repository(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
@@ -588,6 +628,16 @@ class IntegrationAgent(BaseAgent):
         """Simulate GitHub file upload"""
         await asyncio.sleep(1)  # Simulate upload time
         
+        # Check if this is for generated_apps repository
+        if repo_name == "generated_apps":
+            simulation_note = (
+                "Repository 'generated_apps' needs to be created first. "
+                "Either create it manually on GitHub or configure GitHub token for automatic creation. "
+                "See GITHUB_SETUP.md for configuration instructions."
+            )
+        else:
+            simulation_note = 'This is a simulated upload - enable GitHub integration for real uploads'
+        
         return {
             'upload_status': 'success (simulated)',
             'repository': f"{owner}/{repo_name}",
@@ -595,7 +645,7 @@ class IntegrationAgent(BaseAgent):
             'commit_sha': f"sim_{hash(str(files)) % 10000}",
             'files_uploaded': list(files.keys()),
             'upload_timestamp': asyncio.get_event_loop().time(),
-            'simulation_note': 'This is a simulated upload - enable GitHub integration for real uploads'
+            'simulation_note': simulation_note
         }
     
     async def _simulate_github_repository_creation(self, name: str, description: str, private: bool) -> Dict[str, Any]:

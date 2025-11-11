@@ -129,6 +129,10 @@ class ApplicationLauncherService:
             # Get the directory of the executable
             working_dir = Path(executable_path).parent
             
+            # Check if this is a web application
+            app_type = app_info.get('app_type', '')
+            is_web_app = app_type == 'web_app' or self._is_web_application(executable_path)
+            
             # Launch the process
             process = subprocess.Popen(
                 command,
@@ -140,11 +144,21 @@ class ApplicationLauncherService:
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
             )
             
+            # If it's a web app, wait a moment and then try to open browser
+            if is_web_app:
+                await asyncio.sleep(2)  # Wait for server to start
+                port = app_info.get('port', 5000)
+                url = f"http://127.0.0.1:{port}"
+                await self._open_browser(url)
+                self.logger.info(f"Web application started at {url}")
+            
             return {
                 'status': 'success',
                 'process': process,
                 'pid': process.pid,
-                'message': f'Application launched successfully with PID {process.pid}'
+                'message': f'Application launched successfully with PID {process.pid}',
+                'is_web_app': is_web_app,
+                'url': f"http://127.0.0.1:{app_info.get('port', 5000)}" if is_web_app else None
             }
             
         except Exception as e:
@@ -154,6 +168,55 @@ class ApplicationLauncherService:
                 'error': str(e),
                 'message': 'Failed to start application process'
             }
+
+    def _is_web_application(self, executable_path: str) -> bool:
+        """Check if the application is a web application by examining the code"""
+        try:
+            with open(executable_path, 'r', encoding='utf-8') as f:
+                code = f.read().lower()
+                
+            # Look for web framework imports and patterns
+            web_indicators = [
+                'from flask import',
+                'import flask',
+                'from fastapi import',
+                'import fastapi',
+                'from django import',
+                'import django',
+                'app.run(',
+                'uvicorn.run(',
+                '@app.route(',
+                'app = Flask',
+                'app = FastAPI',
+                '.run(debug=',
+                '.run(host='
+            ]
+            
+            return any(indicator in code for indicator in web_indicators)
+            
+        except Exception as e:
+            self.logger.warning(f"Could not detect web app type: {e}")
+            return False
+
+    async def _open_browser(self, url: str) -> None:
+        """Open the web application in the default browser"""
+        try:
+            import webbrowser
+            # Use threading to avoid blocking
+            import threading
+            
+            def open_url():
+                try:
+                    webbrowser.open(url)
+                    self.logger.info(f"Opened browser for {url}")
+                except Exception as e:
+                    self.logger.warning(f"Could not open browser for {url}: {e}")
+            
+            # Open browser in a separate thread after a small delay
+            threading.Timer(1.0, open_url).start()
+            
+        except Exception as e:
+            self.logger.warning(f"Browser opening failed: {e}")
     
     def _monitor_app(self, app_id: str):
         """Monitor running application"""
