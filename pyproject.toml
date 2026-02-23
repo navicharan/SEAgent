@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seagent"
+version = "1.0.0"
+description = "SEAgent - Autonomous Software Engineering Agent System"
+requires-python = ">=3.9"
+
+[project.scripts]
+app = "api.app:app"
