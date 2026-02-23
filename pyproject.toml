@@ -10,3 +10,9 @@ requires-python = ">=3.9"
 
 [project.scripts]
 app = "api.app:app"
+
+[tool.setuptools]
+packages = ["api", "agents", "config", "integrations", "orchestrator", "ui"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.yaml", "*.html"]
