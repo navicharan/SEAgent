@@ -1,5 +1,6 @@
 """
 Vercel entrypoint for SEAgent API
+Optimized for serverless deployment with lazy initialization
 """
 import os
 import sys
@@ -16,18 +17,46 @@ from api.server import APIServer
 # Initialize settings
 settings = Settings()
 
-# Initialize coordinator (will be done on first request in serverless)
-coordinator = AgentCoordinator(settings)
+# Global coordinator instance (lazy initialization)
+coordinator = None
+api_server_instance = None
 
-# Create API server instance
-api_server = APIServer(coordinator, settings)
+def get_coordinator():
+    """Get or create coordinator instance"""
+    global coordinator
+    if coordinator is None:
+        coordinator = AgentCoordinator(settings)
+        coordinator.initialized = False  # Mark as not initialized
+    return coordinator
+
+def get_app():
+    """Get or create FastAPI app instance"""
+    global api_server_instance
+    if api_server_instance is None:
+        coord = get_coordinator()
+        api_server_instance = APIServer(coord, settings)
+    return api_server_instance.app
 
 # Export the FastAPI app for Vercel
-app = api_server.app
+app = get_app()
 
-# Vercel serverless function needs initialization on cold start
-@app.on_event("startup")
-async def startup_event():
-    """Initialize coordinator on startup"""
-    if not coordinator.initialized:
-        await coordinator.initialize()
+# Lazy initialization middleware - initialize on first request
+@app.middleware("http")
+async def initialize_on_request(request, call_next):
+    """Initialize coordinator on first request"""
+    coord = get_coordinator()
+    if not coord.initialized:
+        try:
+            # Mark as initializing to prevent concurrent initializations
+            coord.initialized = True
+            # Initialize agents without starting background loops (serverless)
+            for agent_name, agent in coord.agents.items():
+                if not agent.is_initialized:
+                    await agent.initialize()
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to initialize coordinator: {e}")
+            coord.initialized = False
+    
+    response = await call_next(request)
+    return response

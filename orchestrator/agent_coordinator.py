@@ -4,6 +4,7 @@ Agent Coordinator - Central orchestration system for multi-agent workflows
 
 import asyncio
 import logging
+import os
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
@@ -90,20 +91,33 @@ class AgentCoordinator:
         # Workflow templates
         self.workflow_templates = self._load_workflow_templates()
         
+        # Initialization flag
+        self.initialized = False
+        
     async def initialize(self):
         """Initialize all agents and start coordination loops"""
+        if self.initialized:
+            self.logger.info("Agent Coordinator already initialized, skipping...")
+            return
+            
         self.logger.info("Initializing Agent Coordinator...")
         
         # Initialize all agents
         for agent_name, agent in self.agents.items():
-            await agent.initialize()
-            self.logger.info(f"Initialized {agent_name} agent")
+            if not agent.is_initialized:
+                await agent.initialize()
+                self.logger.info(f"Initialized {agent_name} agent")
         
-        # Start coordination loops
-        asyncio.create_task(self._task_processor())
-        asyncio.create_task(self._agent_communication_handler())
-        asyncio.create_task(self._workflow_monitor())
+        # Start coordination loops only in non-serverless environments
+        if not os.environ.get('VERCEL') and not os.environ.get('AWS_LAMBDA_FUNCTION_NAME'):
+            asyncio.create_task(self._task_processor())
+            asyncio.create_task(self._agent_communication_handler())
+            asyncio.create_task(self._workflow_monitor())
+            self.logger.info("Started background coordination loops")
+        else:
+            self.logger.info("Serverless environment detected, skipping background loops")
         
+        self.initialized = True
         self.logger.info("Agent Coordinator initialized successfully")
     
     async def submit_task(self, task: Task) -> str:

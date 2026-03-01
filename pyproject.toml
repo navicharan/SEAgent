@@ -7,12 +7,28 @@ name = "seagent"
 version = "1.0.0"
 description = "SEAgent - Autonomous Software Engineering Agent System"
 requires-python = ">=3.9"
+dependencies = [
+    "fastapi==0.104.1",
+    "uvicorn==0.24.0",
+    "pydantic==2.5.0",
+    "pydantic-settings==2.1.0",
+    "PyYAML==6.0.1",
+    "aiofiles==23.2.1",
+    "requests==2.31.0",
+    "httpx==0.25.2",
+    "openai==1.3.7",
+    "PyGithub==1.59.1",
+    "gitpython==3.1.40",
+    "bandit==1.7.5",
+    "rich==13.7.0",
+    "jinja2==3.1.2"
+]
 
 [project.scripts]
 app = "api.app:app"
 
 [tool.setuptools]
-packages = ["api", "agents", "config", "integrations", "orchestrator", "ui"]
+packages = ["api", "agents", "config", "integrations", "orchestrator"]
 
 [tool.setuptools.package-data]
 "*" = ["*.json", "*.yaml", "*.html"]

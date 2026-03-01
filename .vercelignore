@@ -1,0 +1,68 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Examples and tests
+examples/
+tests/
+test_*.py
+
+# Docker files (not needed in Vercel)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# CI/CD files (GitHub Actions, not Vercel)
+.github/
+
+# Local development
+.env
+.env.local
+*.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Large datasets
+datasets/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project documentation
+PROJECT_DOCUMENTATION.txt

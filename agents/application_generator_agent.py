@@ -1096,8 +1096,14 @@ if __name__ == '__main__':
                 }
             
             # Create temporary directory for the application
-            temp_dir = tempfile.mkdtemp(prefix=f'seagent_{app_type}_')
-            self.logger.info(f"Created temp directory: {temp_dir}")
+            # Use /tmp for serverless environments (Vercel, Lambda)
+            if os.environ.get('VERCEL') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME'):
+                base_temp = Path('/tmp')
+            else:
+                base_temp = Path(tempfile.gettempdir())
+            
+            temp_dir = tempfile.mkdtemp(prefix=f'seagent_{app_type}_', dir=str(base_temp))
+            self.logger.info(f\"Created temp directory: {temp_dir}\")
             
             # Main application file
             main_file = Path(temp_dir) / app_code.get('filename', f'{app_type}.py')
